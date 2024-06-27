@@ -21,6 +21,7 @@ export interface OptionsFace {
     level?: number;
     isPlayback?: boolean;
     debug?: boolean;
+    whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
 }
 
 export interface KingWebEye {

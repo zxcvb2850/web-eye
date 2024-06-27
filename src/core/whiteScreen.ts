@@ -3,17 +3,18 @@
  * */
 import {_global, _support, getTimestamp, on} from "../utils";
 
-const containerElements = ["html", "body", "#root", ".main-fix"];
 const maxLoopCount = 10;
 
 export default function whiteScreen() {
     const startTimerNow = getTimestamp(); // 当前时间
     let loopCount = 0;
     // 页面加载完毕
-    if (document.readyState === 'complete') {
-        sampleComparison();
-    } else {
-        on(_global, "load", sampleComparison);
+    if (_support.options.whiteScreenDoms?.length) {
+        if (document.readyState === 'complete') {
+            sampleComparison();
+        } else {
+            on(_global, "load", sampleComparison);
+        }
     }
 
     // 采样对比
@@ -76,7 +77,7 @@ export default function whiteScreen() {
     function isContainer(element: Element) {
         if (!element) return false;
         const selector = getSelector(element);
-        return containerElements.includes(selector);
+        return (_support.options.whiteScreenDoms as string[]).includes(selector);
     }
 
     // 白屏检测放回状态

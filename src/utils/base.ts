@@ -5,8 +5,11 @@ export const getTimestamp = (): number => {
     return new Date().getTime()
 }
 
+// 记录最后一次的路由
+export const localStorageRouter = "_king_web_eye_router_";
+// 保存用户的UUID
+export const localStorageUUID = "_king_web_eye_uuid_";
 // 分割
-export const localStorageKey = "_king_web_eye_router_";
 const splitStr = "|||";
 
 // 设置缓存数据

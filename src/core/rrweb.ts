@@ -2,12 +2,12 @@ import {record, pack} from "rrweb";
 import {_support, WebIndexedDB} from "../utils";
 
 export default async function rrweb() {
-    const webIndexedDB = new WebIndexedDB("test", "_test_");
+    const webIndexedDB = new WebIndexedDB("king_web_eye", "web_rr_db");
     await webIndexedDB.openDatabase();
 
     record({
         emit(event, isCheckout) {
-            console.log("--rrweb---", event, isCheckout, webIndexedDB);
+            // console.log("--rrweb---", event, isCheckout, webIndexedDB);
             // webIndexedDB?.db && webIndexedDB.addItem(event);
         },
         checkoutEveryNms: 30 * 1000, // 每5分钟重新制作快照
@@ -16,10 +16,4 @@ export default async function rrweb() {
             input: "last", // 连续输入时，只录制最终值
         }
     });
-
-    _support.events.on("error", (...args: any[]) => {
-        console.error("---rrweb error---", ...args);
-    })
-
-    console.info("---record---", record);
 }

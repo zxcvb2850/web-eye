@@ -1,3 +1,4 @@
+import {UAParser} from "ua-parser-js";
 import packageJson from "../../package.json";
 import {KingWebEye, Window} from "../types";
 
@@ -9,8 +10,14 @@ function getGlobal(): Window{
 export let _support = getSupport();
 _support.name = packageJson.name;
 _support.version = packageJson.version;
+const ua = new UAParser().getResult();
 _support.devices = {
-
+    browser: ua.browser.name,
+    browserVersion: ua.browser.version,
+    os: ua.os.name,
+    osVersion: ua.os.version,
+    device: ua.device?.model || "PC",
+    ua,
 }
 
 function getSupport(): KingWebEye{

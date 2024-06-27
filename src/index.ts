@@ -1,7 +1,8 @@
-import {_global, _support, EventsBus, validateOptions} from "./utils";
+import {_global, _support, EventsBus, getCacheData, localStorageUUID, on, setCacheData, validateOptions} from "./utils";
 import {IAnyObject, OptionsFace} from "./types";
 import logger, {LOG_LEVEL_ENUM} from "./logger";
 import {registerEvents} from "./core/registerEvents";
+import FingerprintJS from "@fingerprintjs/fingerprintjs";
 
 /**
  * 入口文件
@@ -21,6 +22,20 @@ class KingWebEye {
 
         _support.options = this.options;
         _support.events = new EventsBus();
+
+        on(_global, "DOMContentLoaded", async () => {
+            const {value} = getCacheData(localStorageUUID);
+            if (value) {
+                this.setParams("uuid", value);
+            } else {
+                const fp = await FingerprintJS.load();
+                const result = await fp.get();
+                if (result?.visitorId) {
+                    setCacheData(localStorageUUID, result.visitorId);
+                    this.setParams("uuid", result.visitorId);
+                }
+            }
+        })
     }
 
     init (options: OptionsFace){

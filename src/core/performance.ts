@@ -13,6 +13,9 @@ function Performance() {
             console.info("---TTFB---", navigationEntry.responseStart - navigationEntry.requestStart);
             _support.events.emit(eventType, {TTFB: navigationEntry.responseStart - navigationEntry.requestStart});
         }
+
+        const {href, pathname, hash, search} = _global.location;
+        console.info("---load---", href, pathname, hash, search);
     })
 
     // FCP (First Contentful Paint)：页面首次绘制任何内容（文本、图像、SVG 等）的时间。
