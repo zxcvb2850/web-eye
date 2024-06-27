@@ -1,0 +1,35 @@
+{
+  "name": "king-web-eye",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/build.cjs.js",
+  "module": "dist/bundle.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@fingerprintjs/fingerprintjs": "^4.4.1",
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.0",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "@types/ua-parser-js": "^0.7.39",
+    "rollup": "^4.18.0",
+    "rollup-plugin-livereload": "^2.0.5",
+    "typescript": "^5.5.2",
+    "ua-parser-js": "^1.0.38"
+  },
+  "dependencies": {
+    "@types/node": "^20.14.7",
+    "rrweb": "2.0.0-alpha.4",
+    "rrweb-player": "1.0.0-alpha.4",
+    "tslib": "^2.6.3"
+  },
+  "type": "module"
+}

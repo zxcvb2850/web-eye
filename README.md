@@ -1,2 +1,2 @@
-# web-error-collect
+# web-eye
 HTML JavaScript Error Collect
