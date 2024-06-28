@@ -6,7 +6,7 @@ import {HttpCallbackEnum, EventTypesEnum} from "../types";
 import whiteScreen from "./whiteScreen";
 import rrweb from "./rrweb";
 
-export function http() {
+export function httpProxy() {
     const eventTypeFetch = EventTypesEnum.FETCH;
     const eventTypeXHR = EventTypesEnum.XHR;
     // 重写 fetch

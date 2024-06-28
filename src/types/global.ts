@@ -1,7 +1,8 @@
-import {EventsBusFace} from "./base";
+import {EventsBusFace, IAnyObject} from "./base";
 
 export interface Window {
     __king_web_eye__: KingWebEye;
+    screen: any;
     document: Document;
     addEventListener: EventListener;
     removeEventListener: EventListener;
@@ -27,11 +28,10 @@ export interface OptionsFace {
 export interface KingWebEye {
     name: string;
     version: string;
-    /*init(options: OptionsFace);
-    setOptions(key:any, value: any);
-    setParams(key: any, value: any);*/
     devices: any;
     options: OptionsFace;
+    params: IAnyObject,
     events: EventsBusFace;
+    report: any;
     _loop_while_screen_timer_: any;
 }

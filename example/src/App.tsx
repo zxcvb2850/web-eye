@@ -5,7 +5,7 @@ import 'rrweb-player/dist/style.css';
 import IndexPage from "./views/IndexPage";
 import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
-import init, {gzip_compress} from "./pkg/wasm_sdk_util";
+// import init, {gzip_compress} from "./pkg/wasm_sdk_util";
 import './App.css'
 
 function App() {
@@ -13,12 +13,12 @@ function App() {
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        init();
-    }, [init]);
+        // init();
+    }, []);
 
     const clickButton = () => {
         console.log("---clickButton---");
-        const text = "Hello World";
+        /*const text = "Hello World";
         const encoder = new TextEncoder();
         const data = encoder.encode(text);
         const compressedData = gzip_compress(data);
@@ -32,7 +32,7 @@ function App() {
             body: compressedData,
         })
             .then(res => res.text())
-            .then(res => console.info("---res---", res));
+            .then(res => console.info("---res---", res));*/
     }
 
     const clickLoadSourceError = () => {

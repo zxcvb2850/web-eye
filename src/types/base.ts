@@ -39,3 +39,36 @@ export enum EventTypesEnum {
     HISTORY = "history",
     HASHCHANGE = "hashchange",
 }
+
+/**
+ * 性能检测枚举
+ * */
+export enum PerformanceEnum {
+    LCP = "LCP",
+    FCP = "FCP",
+    FSP = "FSP",
+    TTFB = "TTFB",
+}
+
+/**
+ * 上报类型
+ * */
+export enum ReportTypeEnum {
+    PERFORMANCE = "performance",
+    FETCH = "fetch",
+    XHR = "xhr",
+    CLICK = "click",
+    HISTORY = "history",
+    HASHCHANGE = "hashchange",
+}
+
+/**
+ * 枚举网络请求错误
+ * */
+export enum NetworkErrorEnum {
+    NETWORK = "network",
+    ERROR = "error",
+    TIMEOUT = "timeout",
+    ABORT = "abort",
+    SUCCESS = "success",
+}

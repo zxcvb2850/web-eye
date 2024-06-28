@@ -1,15 +1,26 @@
-import {_global, _support, EventsBus, getCacheData, localStorageUUID, on, setCacheData, validateOptions} from "./utils";
-import {IAnyObject, OptionsFace} from "./types";
+import {
+    _global,
+    _support,
+    EventsBus,
+    getCacheData,
+    isObject,
+    localStorageUUID,
+    setCacheData,
+    validateOptions
+} from "./utils";
+import {OptionsFace} from "./types";
 import logger, {LOG_LEVEL_ENUM} from "./logger";
 import {registerEvents} from "./core/registerEvents";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
+import ReportSend from "./core/reportSend";
+import WebVitals from "./webVitals";
+import HttpProxy from "./httpProxy";
 
 /**
  * 入口文件
  * */
 class KingWebEye {
     public options: OptionsFace;
-    public params: IAnyObject;
     constructor() {
         this.options = {
             dsn: "",
@@ -18,24 +29,26 @@ class KingWebEye {
             isConsole: true,
         };
 
-        this.params = {};
-
         _support.options = this.options;
         _support.events = new EventsBus();
+        _support.report = new ReportSend();
 
-        on(_global, "DOMContentLoaded", async () => {
-            const {value} = getCacheData(localStorageUUID);
-            if (value) {
-                this.setParams("uuid", value);
-            } else {
-                const fp = await FingerprintJS.load();
-                const result = await fp.get();
-                if (result?.visitorId) {
-                    setCacheData(localStorageUUID, result.visitorId);
-                    this.setParams("uuid", result.visitorId);
-                }
-            }
-        })
+        const {value} = getCacheData(localStorageUUID);
+        if (value) {
+            this.setParams("uuid", value);
+        } else {
+            FingerprintJS.load()
+                .then(fp => fp.get())
+                .then(result => {
+                    if (result?.visitorId) {
+                        setCacheData(localStorageUUID, result.visitorId);
+                        this.setParams("uuid", result.visitorId);
+                    }
+                });
+        }
+
+        // WEB性能上报
+        new WebVitals();
     }
 
     init (options: OptionsFace){
@@ -53,7 +66,8 @@ class KingWebEye {
         // 初始化日志
         logger.init();
 
-        registerEvents();
+        // 请求监听
+        new HttpProxy();
     }
     setOptions(key: keyof OptionsFace, value: OptionsFace[keyof OptionsFace]) {
         if (this.options.hasOwnProperty(key)) {
@@ -65,7 +79,10 @@ class KingWebEye {
         }
     }
     setParams(key: any, value: any) {
-        this.params[key] = value;
+        if (!isObject(_support.params)) {
+            _support.params = {};
+        }
+        _support.params[key] = value;
     }
 }
 

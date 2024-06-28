@@ -1,19 +1,23 @@
-import {Callback, HttpCallbackEnum, EventTypesEnum} from "../types";
+import {HttpCallbackEnum, EventTypesEnum} from "../types";
 import {_support} from "../utils";
 import logger from "../logger";
 import performance from "./performance";
-import {http} from "./http";
+import {httpProxy} from "./httpProxy";
 import historyRouter from "./historyRouter";
+import WebPerformance from "../webPerformance";
 
 export function registerEvents() {
     // 性能检测
-    performance();
-    _support.events.on(EventTypesEnum.PERFORMANCE, (args: any) => {
-        logger.log(args);
-    });
+    Promise.all([performance.getLCP(), performance.getFCP(), performance.getFSP(), performance.getTTFB()]).then((res: any[]) => {
+        const eventType = EventTypesEnum.PERFORMANCE;
+        console.info("---eventType---", eventType);
+        console.info("---Promise res---", res);
+        console.info("---_support---", JSON.stringify(_support.params));
+        console.info("---devices---", JSON.stringify(_support.devices));
+    })
 
     // 重写http请求
-    http();
+    httpProxy();
     _support.events.on(EventTypesEnum.FETCH, (args: any, callbackType: HttpCallbackEnum) => {
         logger.log(args);
     });
@@ -30,11 +34,4 @@ export function registerEvents() {
         logger.log(args);
     });
 
-}
-
-function addHandleEvent(callback: Callback, type: EventTypesEnum) {
-    if (type === EventTypesEnum.PERFORMANCE) {
-        callback();
-        performance();
-    }
 }

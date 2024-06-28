@@ -11,6 +11,13 @@
     "rootDir": "./src",
     "resolveJsonModule": true,
     "moduleResolution": "node",
+    "lib": [
+      "decorators",
+      "dom",
+      "es5",
+      "scripthost",
+      "es2015.promise"
+    ]
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules"]

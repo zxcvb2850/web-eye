@@ -4,4 +4,7 @@
 export default class ReportSend {
     constructor() {
     }
+    send(custom: any) {
+
+    }
 }

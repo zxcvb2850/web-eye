@@ -1,4 +1,5 @@
 import {_global} from "../utils";
+import {Callback, IAnyObject} from "../types";
 
 // 获取当前时间
 export const getTimestamp = (): number => {
@@ -28,3 +29,68 @@ export function getCacheData(key: string): {value: string | null, time: number} 
 
     return {value: data, time: 0};
 }
+
+
+/**
+ * 监听页面加载完成
+ * @param {Callback} callback
+ */
+export const afterLoad = (callback: Callback): void => {
+    if (document.readyState === 'complete') {
+        callback();
+    } else {
+        window.addEventListener('pageshow', callback, { once: true, capture: true });
+    }
+};
+
+/**
+ * GET请求地址获取参数
+ * */
+export const getDomainFromUrl = (url: string): IAnyObject => {
+    const str = "/x?a=1&b=2";
+
+    const domain = new URL(url);
+
+    console.info("===get url===", domain);
+
+    return {};
+}
+
+/**
+ * 获取域名相关数据
+ * */
+export const getDomainUrl = (url: string): URL => {
+    return new URL(url, window.location.origin); // 使用 window.location.origin 处理相对URL
+}
+
+/**
+ * 获取查询参数
+ * */
+export const getQueryParams = (url: string): { [key: string]: string } => {
+    const params: { [key: string]: string } = {};
+    const parsedUrl = getDomainUrl(url);
+    parsedUrl.searchParams.forEach((value, key) => {
+        params[key] = value;
+    });
+    return params;
+}
+
+/**
+ * 解析 URL 编码的请求体
+ * */
+export const parseUrlEncodedBody = (body: string): { [key: string]: string } => {
+    const params = new URLSearchParams(body);
+    const parsedBody: { [key: string]: string } = {};
+    params.forEach((value, key) => {
+        parsedBody[key] = value;
+    });
+    return parsedBody;
+}
+
+/**
+ * 请求 Headers Key 驼峰写法
+ * */
+export const formatHeadersKey = (headersKey: string): string => {
+    return headersKey.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()).join('-');
+}
+
