@@ -7,6 +7,7 @@ import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
 // import init, {gzip_compress} from "./pkg/wasm_sdk_util";
 import './App.css'
+import KingWebEye from "../../src";
 
 function App() {
     const navigate = useNavigate();
@@ -33,11 +34,17 @@ function App() {
         })
             .then(res => res.text())
             .then(res => console.info("---res---", res));*/
+
+        KingWebEye.init({
+            dsn: "http://test-web-eye2",
+            appid: "test-web-eye2",
+            isPlayback: false,
+        })
     }
 
     const clickLoadSourceError = () => {
         const image = new Image();
-        image.src = "//test.com/test.png";
+        image.src = "example.com/test.png";
 
         const bodyDom: HTMLBodyElement | null = document.querySelector("body");
         bodyDom && bodyDom.append(image);

@@ -10,11 +10,11 @@ import {
 } from "./utils";
 import {OptionsFace} from "./types";
 import logger, {LOG_LEVEL_ENUM} from "./logger";
-import {registerEvents} from "./core/registerEvents";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
-import ReportSend from "./core/reportSend";
-import WebVitals from "./webVitals";
-import HttpProxy from "./httpProxy";
+import WebVitals from "./core/webVitals";
+import HttpProxy from "./core/httpProxy";
+import HistoryRouter from "./core/historyRouter";
+import HandleListener from "./core/handleListener";
 
 /**
  * 入口文件
@@ -31,7 +31,6 @@ class KingWebEye {
 
         _support.options = this.options;
         _support.events = new EventsBus();
-        _support.report = new ReportSend();
 
         const {value} = getCacheData(localStorageUUID);
         if (value) {
@@ -49,9 +48,14 @@ class KingWebEye {
 
         // WEB性能上报
         new WebVitals();
+        // 路由监听
+        new HistoryRouter();
+        // 全局监听错误
+        new HandleListener();
     }
 
     init (options: OptionsFace){
+        console.info("----------------------------");
         if (!options?.dsn) logger.error("dsn is required");
         if (!options?.appid) logger.error("appid is required");
         validateOptions(options.dsn, "dsn", "string") && (this.options.dsn = options.dsn);

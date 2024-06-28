@@ -1,5 +1,5 @@
 import {_global, _support, afterLoad, getTimestamp, on} from "../utils";
-import {ReportTypeEnum} from "../types";
+import {PerformanceEnum, ReportTypeEnum} from "../types";
 import logger from "../logger";
 
 interface MetricFace {
@@ -37,7 +37,7 @@ export default class WebVitals {
         return new Promise((resolve, reject) => {
             const [navigationEntry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
             if (navigationEntry) {
-                this.metrics.push({type: "TTFB", time: navigationEntry.responseStart - navigationEntry.requestStart, rating: getTimestamp() - this.startTime});
+                this.metrics.push({type: PerformanceEnum.TTFB, time: navigationEntry.responseStart - navigationEntry.requestStart, rating: getTimestamp() - this.startTime});
                 resolve(null);
             } else {
                 reject("TTFB error");
@@ -51,7 +51,7 @@ export default class WebVitals {
             new PerformanceObserver((entryList) => {
                 const fcpEntry = entryList.getEntriesByName("first-contentful-paint")[0];
                 if (fcpEntry) {
-                    this.metrics.push({type: "FCP", time: fcpEntry.startTime, rating: getTimestamp() - this.startTime});
+                    this.metrics.push({type: PerformanceEnum.FCP, time: fcpEntry.startTime, rating: getTimestamp() - this.startTime});
                     resolve(null);
                 } else {
                     reject("FCP error");
@@ -66,7 +66,7 @@ export default class WebVitals {
             new PerformanceObserver((entryList) => {
                 const lcpEntry = entryList.getEntries()[0];
                 if (lcpEntry) {
-                    this.metrics.push({type: "LCP", time: lcpEntry.startTime, rating: getTimestamp() - this.startTime});
+                    this.metrics.push({type: PerformanceEnum.LCP, time: lcpEntry.startTime, rating: getTimestamp() - this.startTime});
                     resolve(null);
                 } else {
                     reject("LCP error");
@@ -80,7 +80,7 @@ export default class WebVitals {
             new PerformanceObserver((entryList) => {
                 entryList.getEntries().forEach((entry) => {
                     if (entry.name === "first-contentful-paint") {
-                        this.metrics.push({type: "FSP", time: entry.startTime, rating: getTimestamp() - this.startTime});
+                        this.metrics.push({type: PerformanceEnum.FSP, time: entry.startTime, rating: getTimestamp() - this.startTime});
                         resolve(null);
                     }
                 })
@@ -97,7 +97,7 @@ export default class WebVitals {
                 po.disconnect()
                 console.info("---metrics report---", {
                     type: ReportTypeEnum.PERFORMANCE,
-                    data: [{type: "FID", time: fid, rating: getTimestamp() - this.startTime}]
+                    data: [{type: PerformanceEnum.FID, time: fid, rating: getTimestamp() - this.startTime}]
                 });
             })
         }).observe({type: "first-input", buffered: true});
@@ -134,7 +134,7 @@ export default class WebVitals {
             })
             console.info("---metrics report---", {
                 type: ReportTypeEnum.PERFORMANCE,
-                data: [{type: "CLS", time: clsValue}]
+                data: [{type: PerformanceEnum.CLS, time: clsValue}]
             });
         }).observe({type: "layout-shift", buffered: true});
     }

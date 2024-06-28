@@ -6,7 +6,7 @@ import terser from '@rollup/plugin-terser';
 import livereload from 'rollup-plugin-livereload';
 
 export default {
-    input: 'src/index.ts',
+    input: 'src/webVitals.ts',
     output: [
         {
             file: 'dist/bundle.cjs.js',

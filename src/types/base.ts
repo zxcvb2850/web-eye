@@ -29,18 +29,6 @@ export enum HttpCallbackEnum {
 }
 
 /**
- * 监听事件枚举
- * */
-export enum EventTypesEnum {
-    PERFORMANCE = "performance",
-    FETCH = "fetch",
-    XHR = "xhr",
-    CLICK = "click",
-    HISTORY = "history",
-    HASHCHANGE = "hashchange",
-}
-
-/**
  * 性能检测枚举
  * */
 export enum PerformanceEnum {
@@ -48,6 +36,8 @@ export enum PerformanceEnum {
     FCP = "FCP",
     FSP = "FSP",
     TTFB = "TTFB",
+    FID = "FID",
+    CLS = "CLS",
 }
 
 /**
@@ -60,6 +50,9 @@ export enum ReportTypeEnum {
     CLICK = "click",
     HISTORY = "history",
     HASHCHANGE = "hashchange",
+    PROMISE = "promise",
+    CODE = "code",
+    RESOURCES = "resources",
 }
 
 /**
