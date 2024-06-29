@@ -11,7 +11,7 @@ export default class HandleListener {
         on(_global, "error", (event) => {
             if (this.adaptReact()) return true;
             const {message, colno, lineno, filename} = event;
-            console.info("---error---", {
+            console.info("---metrics report---", {
                 type: ReportTypeEnum.CODE,
                 data: {event},
             })
@@ -21,7 +21,7 @@ export default class HandleListener {
     // Promise reject 错误监听
     rejectError() {
         on(window, "unhandledrejection", (event: PromiseRejectionEvent) => {
-            console.info("---unhandledrejection---", {
+            console.info("---metrics report---", {
                 type: ReportTypeEnum.PROMISE,
                 data: {event},
             })

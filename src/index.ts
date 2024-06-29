@@ -2,13 +2,13 @@ import {
     _global,
     _support,
     EventsBus,
-    getCacheData,
+    getCacheData, getUuid,
     isObject,
     localStorageUUID,
     setCacheData,
     validateOptions
 } from "./utils";
-import {OptionsFace} from "./types";
+import {OptionsFace, ParamsFace} from "./types";
 import logger, {LOG_LEVEL_ENUM} from "./logger";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import WebVitals from "./core/webVitals";
@@ -32,19 +32,26 @@ class KingWebEye {
         _support.options = this.options;
         _support.events = new EventsBus();
 
+        if (!isObject(_support.params)) {
+            _support.params = {};
+        }
+        // 浏览器指纹
         const {value} = getCacheData(localStorageUUID);
         if (value) {
-            this.setParams("uuid", value);
+            _support.params["visitorId"] = value;
         } else {
             FingerprintJS.load()
                 .then(fp => fp.get())
                 .then(result => {
                     if (result?.visitorId) {
                         setCacheData(localStorageUUID, result.visitorId);
-                        this.setParams("uuid", result.visitorId);
+                        _support.params["visitorId"] = result.visitorId;
                     }
                 });
         }
+        // 本次uuid
+        const uuid = getUuid();
+        if (uuid) _support.params["uuid"] = uuid;
 
         // WEB性能上报
         new WebVitals();
@@ -82,9 +89,10 @@ class KingWebEye {
             }
         }
     }
-    setParams(key: any, value: any) {
-        if (!isObject(_support.params)) {
-            _support.params = {};
+    setParams(key: keyof ParamsFace, value: any) {
+        if (key === "visitorId" || key === "uuid") {
+            logger.warn(`Unable to set ${key} field`);
+            return false;
         }
         _support.params[key] = value;
     }

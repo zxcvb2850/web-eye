@@ -21,7 +21,7 @@ _support.devices = {
     device: ua.device?.model || "PC",
     winScreen: `${_global.screen.width}x${_global.screen.height}`,
     docScreen: `${docScreenW}x${docScreenH}`,
-    ua,
+    ua: ua.ua,
 }
 
 function getSupport(): KingWebEye{

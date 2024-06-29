@@ -58,7 +58,7 @@ export default class HttpProxy {
                     params = getQueryParams(requestUrl);
                 } else if (method === 'POST' || method === 'PUT') {
                     const contentType = headersObj['Content-Type'];
-                    if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+                    if (contentType?.includes('application/x-www-form-urlencoded')) {
                         params = parseUrlEncodedBody(body);
                     } else {
                         try {
@@ -75,7 +75,7 @@ export default class HttpProxy {
                     .then((res: Response) => {
                         const endTime = getTimestamp();
                         const time = endTime - startTime;
-                        console.info("---fetch send success---", {
+                        console.info("---metrics report---", {
                             type: ReportTypeEnum.FETCH,
                             data: {
                                 status: NetworkErrorEnum.SUCCESS,
@@ -90,7 +90,7 @@ export default class HttpProxy {
                     }, (err: Error) => {
                         const endTime = getTimestamp();
                         const time = endTime - startTime;
-                        console.info("---fetch send error---", {
+                        console.info("---metrics report---", {
                             type: ReportTypeEnum.FETCH,
                             data: {
                                 status: NetworkErrorEnum.SUCCESS,
@@ -160,7 +160,7 @@ export default class HttpProxy {
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
 
-                    console.info("---xhr send success---", {
+                    console.info("---metrics report---", {
                         type: ReportTypeEnum.XHR,
                         data: {
                             status: NetworkErrorEnum.SUCCESS,
@@ -175,10 +175,10 @@ export default class HttpProxy {
                 on(this, "error", (err) => {
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
-                    console.info("---xhr send error---", {
+                    console.info("---metrics report---", {
                         type: ReportTypeEnum.XHR,
                         data: {
-                            status: NetworkErrorEnum.SUCCESS,
+                            status: NetworkErrorEnum.ERROR,
                             url,
                             method,
                             headers,

@@ -11,7 +11,7 @@ export default class HistoryRouter {
         on(_global, "hashchange", (event) => {
             const {oldURL, newURL} = event;
             setCacheData(localStorageRouter, newURL);
-            console.info("---hashchange---", {
+            console.info("---metrics report---", {
                 type: ReportTypeEnum.HASHCHANGE,
                 data: {old: oldURL, new: newURL}
             })
@@ -25,7 +25,7 @@ export default class HistoryRouter {
                 const {href, origin} = _global.location;
                 const newPath = `${origin}${args[2]}`;
                 setCacheData(localStorageRouter, newPath);
-                console.log("---pushState---", {
+                console.log("---metrics report---", {
                     type: ReportTypeEnum.HISTORY,
                     data: {old: href, new: newPath},
                 })
@@ -37,7 +37,7 @@ export default class HistoryRouter {
                 const {href} = _global.location;
                 const {value: oldPath, time} = getCacheData(localStorageRouter);
                 setCacheData(localStorageRouter, href);
-                console.log("---pushState---", {
+                console.log("---metrics report---", {
                     type: ReportTypeEnum.HISTORY,
                     data: {old: oldPath, new: href},
                 })
