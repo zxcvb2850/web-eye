@@ -1,3 +1,5 @@
+import {Callback} from "../types";
+
 export class WebIndexedDB {
     public db: IDBDatabase | null;
     public dbName: string;
@@ -9,7 +11,7 @@ export class WebIndexedDB {
         this.storeName = storeName;
     }
 
-    openDatabase() {
+    openDatabase(callback?: Callback) {
         const request = indexedDB.open(this.dbName, 1);
 
         request.onupgradeneeded = (event) => {
@@ -21,10 +23,12 @@ export class WebIndexedDB {
 
         request.onsuccess = (event) => {
             this.db = (event.target as IDBOpenDBRequest).result;
+            callback && callback(true);
         };
 
         request.onerror = (event) => {
             console.error((event.target as IDBOpenDBRequest).error)
+            callback && callback(false);
         };
     }
 

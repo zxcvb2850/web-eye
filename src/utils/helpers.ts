@@ -7,9 +7,11 @@ import logger from "../logger";
  * @param value 需要验证的值
  * @param key 需要验证的 key
  * @param target 需要验证的类型
+ * @param isNull 是否允许为 null
  * @returns {boolean} 验证结果
  * */
-export const validateOptions = (value: OptionsFace[keyof OptionsFace], key: keyof OptionsFace, target: string): boolean => {
+export const validateOptions = (value: OptionsFace[keyof OptionsFace], key: string, target: string, isNull = false): boolean => {
+    if (isNull && value == null) return false;
     const isValid = isType(value, target);
     if (!isValid) {
         logger.error(`${key} must be ${target}, now ${key} is ${typeOf(key)}`)

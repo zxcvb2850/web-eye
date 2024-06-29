@@ -2,23 +2,25 @@
  * 启动白屏检测
  * */
 import {_global, _support, getTimestamp, on} from "../utils";
+import {ReportTypeEnum} from "../types";
 
 const maxLoopCount = 10;
 
-export default function whiteScreen() {
-    const startTimerNow = getTimestamp(); // 当前时间
-    let loopCount = 0;
-    // 页面加载完毕
-    if (_support.options.whiteScreenDoms?.length) {
+export default class WhiteScreen {
+    public startTime = getTimestamp();
+    public loopCount = 0;
+    constructor() {
+        console.info("+++++++++++++++++++++")
+        // 页面加载完毕
         if (document.readyState === 'complete') {
-            sampleComparison();
+            this.sampleComparison();
         } else {
-            on(_global, "load", sampleComparison);
+            on(_global, "load", () => this.sampleComparison());
         }
     }
 
     // 采样对比
-    function sampleComparison() {
+    sampleComparison() {
         let emptyPoints = 0;
         // 横向、纵向，采样 10 个点
         const countPoints = 10;
@@ -34,10 +36,10 @@ export default function whiteScreen() {
                 _global.innerWidth / 2,
                 (_global.innerHeight * i) / 10
             );
-            if(isContainer(xElement as HTMLElement)) emptyPoints++;
+            if(this.isContainer(xElement as HTMLElement)) emptyPoints++;
 
             // 中心点只计算一次
-            if (i !== centerPoint && isContainer(yElement as HTMLElement)) emptyPoints++;
+            if (i !== centerPoint && this.isContainer(yElement as HTMLElement)) emptyPoints++;
         }
 
         (bodyDom as HTMLBodyElement).append(fragment);
@@ -47,24 +49,24 @@ export default function whiteScreen() {
                 clearInterval(_support._loop_while_screen_timer_);
                 _support._loop_while_screen_timer_ = null;
             }
-            whiteScreenCheck(false);
+            this.whiteScreenCheck(false);
         } else {
-            if (loopCount > maxLoopCount) {
-                whiteScreenCheck(true);
+            if (this.loopCount > maxLoopCount) {
+                this.whiteScreenCheck(true);
                 _support._loop_while_screen_timer_ && clearInterval(_support._loop_while_screen_timer_);
             } else {
-                loopCount++;
-                !_support._loop_while_screen_timer_ && loopWhileScreen();
+                this.loopCount++;
+                !_support._loop_while_screen_timer_ && this.loopWhileScreen();
             }
         }
     }
 
-    function loopWhileScreen() {
+    loopWhileScreen() {
         if (_support._loop_while_screen_timer_) return;
-        _support._loop_while_screen_timer_ = setInterval(sampleComparison, 1000);
+        _support._loop_while_screen_timer_ = setInterval(this.sampleComparison, 1000);
     }
 
-    function getSelector(element: Element) {
+    getSelector(element: Element) {
         if (element.id) {
             return `#${element.id}`;
         } else if (element.className) {
@@ -74,15 +76,22 @@ export default function whiteScreen() {
         return element.nodeName.toLowerCase();
     }
 
-    function isContainer(element: Element) {
+    isContainer(element: Element) {
         if (!element) return false;
-        const selector = getSelector(element);
+        const selector = this.getSelector(element);
+
         return (_support.options.whiteScreenDoms as string[]).includes(selector);
     }
 
-    // 白屏检测放回状态
-    function whiteScreenCheck (status: boolean){
+    // 白屏检测返回状态
+    whiteScreenCheck (status: boolean){
         const now = getTimestamp();
-        console.info("---check white screen time---", status, now - startTimerNow);
+        console.info("---metrics report---", {
+            type: ReportTypeEnum.WHITE_SCREEN,
+            data: {
+                status,
+                time: now - this.startTime
+            }
+        });
     }
 }

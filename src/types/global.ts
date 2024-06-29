@@ -34,6 +34,7 @@ export interface OptionsFace {
     isPlayback?: boolean;
     debug?: boolean;
     whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
+    isActionRecord?: boolean;
 }
 
 // 自定义参数

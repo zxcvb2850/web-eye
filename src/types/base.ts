@@ -53,6 +53,7 @@ export enum ReportTypeEnum {
     PROMISE = "promise",
     CODE = "code",
     RESOURCES = "resources",
+    WHITE_SCREEN = "whiteScreen",
 }
 
 /**
