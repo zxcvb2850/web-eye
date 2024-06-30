@@ -7,7 +7,6 @@ import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
 // import init, {gzip_compress} from "./pkg/wasm_sdk_util";
 import './App.css'
-import KingWebEye from "../../src";
 
 function App() {
     const navigate = useNavigate();
@@ -34,12 +33,6 @@ function App() {
         })
             .then(res => res.text())
             .then(res => console.info("---res---", res));*/
-
-        KingWebEye.init({
-            dsn: "http://test-web-eye2",
-            appid: "test-web-eye2",
-            isPlayback: false,
-        })
     }
 
     const clickLoadSourceError = () => {
@@ -65,17 +58,24 @@ function App() {
         navigate("/404", {replace: false});
     }
 
-    const dbName = "test";
-    const storeName = "_test_";
+    const dbName = "king_web_eye";
+    const storeName = "web_rr_db";
     // 播放回放
     const clickPlayback = async () => {
-        const db: IDBDatabase = await openDatabase(dbName, storeName, 1);
-        const events = await getAllItems(db, storeName);
-        console.info("---events---", events);
+        /*const db: IDBDatabase = await openDatabase(dbName, storeName, 1);
+        const events1 = await getAllItems(db, storeName);
+        console.info("====events1===", events1);
         new rrwebPlayer({
             target: ref.current!,
-            props: {events},
-        });
+            props: {events: events1},
+        })*/
+
+        const events2 = JSON.parse(window.localStorage.getItem("test-record")!);
+        console.info("====events2===", events2);
+        new rrwebPlayer({
+            target: ref.current!,
+            props: {events: events2},
+        })
     }
 
     function openDatabase(dbName: string, storeName: string, version: number): Promise<IDBDatabase> {
@@ -124,6 +124,8 @@ function App() {
             <button onClick={clickButton}>点击按钮</button>
             <button onClick={clickChangeRouter}>路由跳转</button>
             <button onClick={clickPlayback}>播放回放</button>
+            <input type="text"/>
+            <input type="password"/>
             <div ref={ref}/>
 
             {/* 路由 */}

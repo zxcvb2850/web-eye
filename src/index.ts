@@ -125,8 +125,8 @@ class KingWebEye {
                 logger.setLevel(value as number);
             }
 
-            if (key === "isActionRecord" && value === false && this.actionRecord?.curRecord) {
-                this.actionRecord.curRecord();
+            if (key === "isActionRecord" && value === false && this.actionRecord?.stopRecord) {
+                this.actionRecord.stopRecord();
             }
 
             (this.options[key] as OptionsFace[keyof OptionsFace]) = value;
