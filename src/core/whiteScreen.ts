@@ -63,7 +63,7 @@ export default class WhiteScreen {
 
     loopWhileScreen() {
         if (_support._loop_while_screen_timer_) return;
-        _support._loop_while_screen_timer_ = setInterval(this.sampleComparison, 1000);
+        _support._loop_while_screen_timer_ = setInterval(this.sampleComparison.bind(this), 1000);
     }
 
     getSelector(element: Element) {

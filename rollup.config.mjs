@@ -3,6 +3,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
+import { wasm } from '@rollup/plugin-wasm';
 import livereload from 'rollup-plugin-livereload';
 
 export default {
@@ -28,6 +29,7 @@ export default {
     plugins: [
         resolve(),
         commonjs(),
+        wasm(),
         typescript({ tsconfig: './tsconfig.json' }),
         json(),
         terser(),

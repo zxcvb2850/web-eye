@@ -18,6 +18,7 @@ import HistoryRouter from "./core/historyRouter";
 import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
+import wasmInit from "./lib/wasm_sdk_util";
 
 /**
  * 入口文件
@@ -64,6 +65,8 @@ class KingWebEye {
         new HistoryRouter();
         // 全局监听错误
         new HandleListener();
+
+        wasmInit();
     }
 
     init(options: OptionsFace) {

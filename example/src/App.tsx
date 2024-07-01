@@ -7,7 +7,6 @@ import 'rrweb/dist/rrweb.min.css';
 import IndexPage from "./views/IndexPage";
 import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
-// import init, {gzip_compress} from "./pkg/wasm_sdk_util";
 import './App.css'
 
 function App() {

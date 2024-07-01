@@ -1,5 +1,7 @@
-import {_global} from "../utils";
+import {_global, isString} from "../utils";
 import {Callback, ErrorTypeEnum, IAnyObject} from "../types";
+import logger from "../logger";
+import {md5} from "../lib/wasm_sdk_util";
 
 // 获取当前时间
 export const getTimestamp = (): number => {
@@ -124,3 +126,14 @@ export const getErrorType = (event: ErrorEvent | Event) => {
     if (!isJsError) return ErrorTypeEnum.SR;
     return event.message === 'Script error.' ? ErrorTypeEnum.CS : ErrorTypeEnum.JS;
 };
+
+/**
+ * 获取MD5，用于上报唯一值，防止重复上报
+ * */
+export const getMd5 = (input: string): string => {
+    if (isString(input)) {
+        return md5(input);
+    }
+    logger.warn("please pass in string type");
+    return "";
+}

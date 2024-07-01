@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Wasm
+wasm-sdk-util/.idea
+wasm-sdk-util/pkg
+wasm-sdk-util/target
