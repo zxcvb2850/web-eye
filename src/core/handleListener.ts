@@ -1,5 +1,5 @@
-import {_global, on} from "../utils";
-import {ReportTypeEnum} from "../types";
+import {_global, getErrorType, on} from "../utils";
+import {ErrorTypeEnum, ReportTypeEnum} from "../types";
 
 export default class HandleListener {
     constructor() {
@@ -8,14 +8,19 @@ export default class HandleListener {
     }
 
     windowError() {
-        on(_global, "error", (event) => {
+        on(_global, "error", (event: ErrorEvent) => {
             if (this.adaptReact()) return true;
-            const {message, colno, lineno, filename} = event;
+            console.info("---event instanceof ErrorEvent---", event instanceof ErrorEvent);
+            if (getErrorType(event) === ErrorTypeEnum.SR) {
+                this.resourcesError(event);
+            } else if(getErrorType(event) === ErrorTypeEnum.JS) {
+                this.scriptCodeError(event);
+            }
             console.info("---metrics report---", {
                 type: ReportTypeEnum.CODE,
                 data: {event},
             })
-        }, false);
+        }, true);
     }
 
     // Promise reject 错误监听
@@ -29,11 +34,15 @@ export default class HandleListener {
     }
 
     // 资源加载错误
-    resourcesError() {
+    resourcesError(event: ErrorEvent) {
+        const cTarget = event.target || event.srcElement
+        const url = (cTarget as HTMLImageElement).src || (cTarget as HTMLAnchorElement).href;
+        console.log("---error source---", url, (cTarget as HTMLElement).localName, event);
     }
 
     // 代码执行错误
-    scriptCodeError() {
+    scriptCodeError(event: ErrorEvent) {
+        console.log("---error code---", event, event.message, event.filename, event.lineno, event.colno, event.error);
     }
 
     // 处理 react 开发环境会执行两次

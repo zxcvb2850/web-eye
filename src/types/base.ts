@@ -20,15 +20,6 @@ export interface EventsBusFace {
 }
 
 /**
- * 枚举错误类型
- * */
-export enum HttpCallbackEnum {
-    ERROR = "ERROR",
-    SUCCESS = "SUCCESS",
-    NETWORK = "NETWORK",
-}
-
-/**
  * 性能检测枚举
  * */
 export enum PerformanceEnum {
@@ -65,4 +56,15 @@ export enum NetworkErrorEnum {
     TIMEOUT = "timeout",
     ABORT = "abort",
     SUCCESS = "success",
+}
+
+/**
+ * 枚举监听错误类型
+ * */
+export enum ErrorTypeEnum {
+    JS = "js", // JS 代码错误类型
+    SR = "source", // 资源错误
+    XML = "xml", // 请求错误
+    CS = "cors", // 资源错误
+    REACT = "react" , // react ErrorBoundary 错误边界
 }

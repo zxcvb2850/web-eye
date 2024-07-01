@@ -2,6 +2,8 @@ import {useEffect, useRef} from "react";
 import {Route, Routes, useNavigate} from "react-router-dom";
 import rrwebPlayer from "rrweb-player";
 import 'rrweb-player/dist/style.css';
+import {record, EventType} from 'rrweb'
+import 'rrweb/dist/rrweb.min.css';
 import IndexPage from "./views/IndexPage";
 import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
@@ -11,6 +13,10 @@ import './App.css'
 function App() {
     const navigate = useNavigate();
     const ref = useRef<HTMLDivElement>(null);
+    const recordFn = useRef<any | null>(null);
+    const recentEvents = useRef<any[]>([]);
+    const metaSnapsho = useRef<any | null>(null);
+    const fullSnapsho = useRef<any | null>(null);
 
     useEffect(() => {
         // init();
@@ -37,7 +43,8 @@ function App() {
 
     const clickLoadSourceError = () => {
         const image = new Image();
-        image.src = "example.com/test.png";
+        image.src = "http://test-img-play.daidaidj.com/img/f3ce557e2c8b4f2c20a0f2acbe8dc926.jpg/224x224";
+        image.alt = "图片";
 
         const bodyDom: HTMLBodyElement | null = document.querySelector("body");
         bodyDom && bodyDom.append(image);
@@ -58,63 +65,53 @@ function App() {
         navigate("/404", {replace: false});
     }
 
-    const dbName = "king_web_eye";
-    const storeName = "web_rr_db";
-    // 播放回放
-    const clickPlayback = async () => {
-        /*const db: IDBDatabase = await openDatabase(dbName, storeName, 1);
-        const events1 = await getAllItems(db, storeName);
-        console.info("====events1===", events1);
-        new rrwebPlayer({
-            target: ref.current!,
-            props: {events: events1},
-        })*/
-
-        const events2 = JSON.parse(window.localStorage.getItem("test-record")!);
-        console.info("====events2===", events2);
-        new rrwebPlayer({
-            target: ref.current!,
-            props: {events: events2},
-        })
-    }
-
-    function openDatabase(dbName: string, storeName: string, version: number): Promise<IDBDatabase> {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(dbName, version);
-
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-                if (!db.objectStoreNames.contains(storeName)) {
-                    db.createObjectStore(storeName, {keyPath: 'id', autoIncrement: true});
+    // 开始录制
+    const clickRecord = async () => {
+        recordFn.current = record({
+            emit(event) {
+                if (event.type === EventType.Meta) {
+                    console.info("===meta===", event);
+                    metaSnapsho.current = event;
+                } else if (event.type === EventType.FullSnapshot) {
+                    console.info("===FullSnapshot===", event);
+                    fullSnapsho.current = event;
+                } else {
+                    recentEvents.current.push(event);
                 }
-            };
-
-            request.onsuccess = (event) => {
-                resolve((event.target as IDBOpenDBRequest).result);
-            };
-
-            request.onerror = (event) => {
-                reject((event.target as IDBOpenDBRequest).error);
-            };
+                if (recentEvents.current.length > 20) {
+                    recentEvents.current.shift();
+                }
+            },
+            sampling: {
+                scroll: 600, // 每 300ms 最多触发一次
+                media: 1000, // 录制媒体间隔时长
+                input: "last", // 连续输入时，只录制最终值
+            },
+            maskAllInputs: true, // 将所有输入内容记录为 *
+            checkoutEveryNth: 200, // 每 N 次事件重新制作一次全量快照
         });
+
     }
-
-    function getAllItems(db: IDBDatabase, storeName: string): Promise<never[]> {
-        return new Promise((resolve, reject) => {
-            const transaction = db.transaction([storeName], 'readonly');
-            const store = transaction.objectStore(storeName);
-            const request = store.getAll();
-
-            request.onsuccess = (event) => {
-                resolve((event.target as IDBRequest).result);
-            };
-
-            request.onerror = (event) => {
-                reject((event.target as IDBRequest).error);
-            };
-        });
+    // 播放回放
+    const clickPlayback = () => {
+        const record = window.localStorage.getItem("test-record");
+        if (record) {
+            const events = JSON.parse(record);
+            if (events?.length){
+                new rrwebPlayer({
+                    target: ref.current!,
+                    props: {
+                        events,
+                        skipInactive: true,
+                        loadTimeout: 1000,
+                        UNSAFE_replayCanvas: true,
+                    },
+                })
+            } else {
+                console.warn("*************************");
+            }
+        }
     }
-
 
     return (
         <>
@@ -123,6 +120,7 @@ function App() {
             <button onClick={clickCodeError}>代码报错</button>
             <button onClick={clickButton}>点击按钮</button>
             <button onClick={clickChangeRouter}>路由跳转</button>
+            <button onClick={clickRecord}>开始录制</button>
             <button onClick={clickPlayback}>播放回放</button>
             <input type="text"/>
             <input type="password"/>

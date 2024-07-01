@@ -1,4 +1,4 @@
-import {_global, _support, afterLoad, getTimestamp, on} from "../utils";
+import {afterLoad, getTimestamp} from "../utils";
 import {PerformanceEnum, ReportTypeEnum} from "../types";
 import logger from "../logger";
 
@@ -132,10 +132,12 @@ export default class WebVitals {
                     }
                 }
             })
-            console.info("---metrics report---", {
-                type: ReportTypeEnum.PERFORMANCE,
-                data: [{type: PerformanceEnum.CLS, time: clsValue}]
-            });
+            if (clsValue > 2.5) {
+                console.info("---metrics report---", {
+                    type: ReportTypeEnum.PERFORMANCE,
+                    data: [{type: PerformanceEnum.CLS, time: clsValue}]
+                });
+            }
         }).observe({type: "layout-shift", buffered: true});
     }
 }

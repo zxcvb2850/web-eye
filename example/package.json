@@ -14,7 +14,8 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.23.1",
     "rrweb": "^2.0.0-alpha.4",
-    "rrweb-player": "1.0.0-alpha.4"
+    "rrweb-player": "1.0.0-alpha.4",
+    "rrweb-snapshot": "2.0.0-alpha.4"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^26.0.1",

@@ -1,5 +1,5 @@
 import {_global} from "../utils";
-import {Callback, IAnyObject} from "../types";
+import {Callback, ErrorTypeEnum, IAnyObject} from "../types";
 
 // 获取当前时间
 export const getTimestamp = (): number => {
@@ -113,3 +113,14 @@ export const getUuid = (): string => {
         return (c === 'x' ? random : (random & 0x3) | 0x8).toString(16);
     });
 }
+
+/**
+ * 判断是js异常、静态资源异常还是跨域异常
+ * @param {(ErrorEvent | Event)} event
+ * @return {*}
+ */
+export const getErrorType = (event: ErrorEvent | Event) => {
+    const isJsError = event instanceof ErrorEvent;
+    if (!isJsError) return ErrorTypeEnum.SR;
+    return event.message === 'Script error.' ? ErrorTypeEnum.CS : ErrorTypeEnum.JS;
+};

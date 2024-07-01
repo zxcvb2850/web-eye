@@ -17,6 +17,10 @@ KingWebEye.init({
 KingWebEye.setParams("source", 1);
 KingWebEye.setParams("channelId", "1000");
 
+const script = document.createElement("script");
+script.src = "/abc.jsx";
+document.body.appendChild(script);
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
         <HashRouter>
