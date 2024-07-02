@@ -33,6 +33,7 @@ class KingWebEye {
             appid: "",
             level: LOG_LEVEL_ENUM.LOG,
             isConsole: true,
+            maxRecordLimit: 100,
         };
 
         _support.options = this.options;
@@ -101,12 +102,13 @@ class KingWebEye {
             }
         }
         if (validateOptions(options.isActionRecord, "actionRecord", "boolean", true)) {
-            (this.options.isActionRecord = options.isActionRecord);
+            this.options.isActionRecord = options.isActionRecord;
             // 是否开启录制
             if (options.isActionRecord) {
                 this.actionRecord = new ActionRecord();
             }
         }
+        validateOptions(options.maxRecordLimit, "maxRecordLimit", "number", true) && (this.options.maxRecordLimit = options.maxRecordLimit)
 
         // 初始化日志
         logger.init();
@@ -116,7 +118,10 @@ class KingWebEye {
 
         // 浏览器关闭/刷新前触发的回调
         on(_global, "beforeunload", (event: Event) => {
-            console.error("===========================")
+            // 关闭前如果有延迟上报的，则执行立即上报
+            if (_support._report_delay_timer) {
+                _support.events.emit("report_song");
+            }
         })
     }
 

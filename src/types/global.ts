@@ -23,7 +23,8 @@ export interface KingWebEye {
     params: IAnyObject,
     events: EventsBusFace;
     report: any;
-    _loop_while_screen_timer_: any;
+    _loop_while_screen_timer_: any; // 白屏轮询定时器
+    _report_delay_timer: any; // 延迟上报定时器
 }
 
 export interface OptionsFace {
@@ -35,6 +36,7 @@ export interface OptionsFace {
     debug?: boolean;
     whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
     isActionRecord?: boolean;
+    maxRecordLimit?: number; // 记录数量
 }
 
 // 自定义参数

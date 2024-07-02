@@ -2,20 +2,16 @@ import {useEffect, useRef} from "react";
 import {Route, Routes, useNavigate} from "react-router-dom";
 import rrwebPlayer from "rrweb-player";
 import 'rrweb-player/dist/style.css';
-import {record, EventType} from 'rrweb'
 import 'rrweb/dist/rrweb.min.css';
 import IndexPage from "./views/IndexPage";
 import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
+import KingWebEye from '../../src';
 import './App.css'
 
 function App() {
     const navigate = useNavigate();
     const ref = useRef<HTMLDivElement>(null);
-    const recordFn = useRef<any | null>(null);
-    const recentEvents = useRef<any[]>([]);
-    const metaSnapsho = useRef<any | null>(null);
-    const fullSnapsho = useRef<any | null>(null);
 
     useEffect(() => {
         // init();
@@ -79,51 +75,29 @@ function App() {
     }
 
     // 开始录制
-    const clickRecord = async () => {
-        recordFn.current = record({
-            emit(event) {
-                if (event.type === EventType.Meta) {
-                    console.info("===meta===", event);
-                    metaSnapsho.current = event;
-                } else if (event.type === EventType.FullSnapshot) {
-                    console.info("===FullSnapshot===", event);
-                    fullSnapsho.current = event;
-                } else {
-                    recentEvents.current.push(event);
-                }
-                if (recentEvents.current.length > 20) {
-                    recentEvents.current.shift();
-                }
-            },
-            sampling: {
-                scroll: 600, // 每 300ms 最多触发一次
-                media: 1000, // 录制媒体间隔时长
-                input: "last", // 连续输入时，只录制最终值
-            },
-            maskAllInputs: true, // 将所有输入内容记录为 *
-            checkoutEveryNth: 200, // 每 N 次事件重新制作一次全量快照
-        });
-
-    }
+    const clickRecord = async () => {}
     // 播放回放
     const clickPlayback = () => {
-        const record = window.localStorage.getItem("test-record");
-        if (record) {
-            const events = JSON.parse(record);
-            if (events?.length){
-                new rrwebPlayer({
-                    target: ref.current!,
-                    props: {
-                        events,
-                        skipInactive: true,
-                        loadTimeout: 1000,
-                        UNSAFE_replayCanvas: true,
-                    },
-                })
-            } else {
-                console.warn("*************************");
+        KingWebEye.setOptions("isActionRecord", false);
+        setTimeout(() => {
+            const record = window.localStorage.getItem("test-record");
+            if (record) {
+                const events = JSON.parse(record);
+                if (events?.length){
+                    new rrwebPlayer({
+                        target: ref.current!,
+                        props: {
+                            events,
+                            skipInactive: true,
+                            loadTimeout: 1000,
+                            UNSAFE_replayCanvas: true,
+                        },
+                    })
+                } else {
+                    console.warn("*************************");
+                }
             }
-        }
+        }, 200);
     }
 
     return (

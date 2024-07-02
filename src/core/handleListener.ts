@@ -1,4 +1,4 @@
-import {_global, getErrorType, getMd5, on, parseStackError} from "../utils";
+import {_global, _support, getErrorType, getMd5, on, parseStackError} from "../utils";
 import {ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown} from "../types";
 
 export default class HandleListener {
@@ -64,6 +64,10 @@ export default class HandleListener {
         const stacks = parseStackError(event.error);
         const {message, filename, lineno, colno} = event;
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
+
+        // 发送事件
+        _support.events.emit(ReportTypeEnum.CODE);
+
         console.info("---metrics report---", {
             type: ReportTypeEnum.CODE,
             data: {
