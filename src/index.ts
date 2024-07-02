@@ -18,6 +18,7 @@ import HistoryRouter from "./core/historyRouter";
 import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
+import OtherListener from "./core/otherListener";
 
 /**
  * 入口文件
@@ -34,6 +35,7 @@ class KingWebEye {
             level: LOG_LEVEL_ENUM.LOG,
             isConsole: true,
             maxRecordLimit: 100,
+            isRecordClick: true,
         };
 
         _support.options = this.options;
@@ -60,11 +62,11 @@ class KingWebEye {
         const uuid = getUuid();
         if (uuid) _support.params["uuid"] = uuid;
 
-        // WEB性能上报
+        // WEB性能监听
         new WebVitals();
         // 路由监听
         new HistoryRouter();
-        // 全局监听错误
+        // 错误监听
         new HandleListener();
     }
 
@@ -109,20 +111,16 @@ class KingWebEye {
             }
         }
         validateOptions(options.maxRecordLimit, "maxRecordLimit", "number", true) && (this.options.maxRecordLimit = options.maxRecordLimit)
+        validateOptions(options.isRecordClick, "isRecordClick", "boolean", true) && (this.options.isRecordClick = options.isRecordClick)
 
-        // 初始化日志
+        // 日志初始化
         logger.init();
 
         // 请求监听
         new HttpProxy();
 
-        // 浏览器关闭/刷新前触发的回调
-        on(_global, "beforeunload", (event: Event) => {
-            // 关闭前如果有延迟上报的，则执行立即上报
-            if (_support._report_delay_timer) {
-                _support.events.emit("report_song");
-            }
-        })
+        // 其他监听
+        new OtherListener();
     }
 
     setOptions(key: keyof OptionsFace, value: OptionsFace[keyof OptionsFace]) {

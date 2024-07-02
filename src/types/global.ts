@@ -37,6 +37,7 @@ export interface OptionsFace {
     whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
     isActionRecord?: boolean;
     maxRecordLimit?: number; // 记录数量
+    isRecordClick?: boolean; // 是否记录点击事件
 }
 
 // 自定义参数

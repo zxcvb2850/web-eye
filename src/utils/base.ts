@@ -180,3 +180,23 @@ export function parseStackError(error: any): StackFrameFace[] {
     }
     return frames;
 }
+
+/**
+ * 节流
+ * */
+export function throttle<T extends (...args: any[]) => void>(func: T, limit: number): T {
+    let lastFunc: ReturnType<typeof setTimeout>;
+    let lastRan: number;
+
+    return function (this:any, ...args){
+        if (lastRan) {
+            func.apply(this, args);
+            lastRan = getTimestamp();
+        } else {
+            clearTimeout(lastFunc);
+            lastFunc = setTimeout(() => {
+                func.apply(this, args);
+            }, limit);
+        }
+    } as T;
+}

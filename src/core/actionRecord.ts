@@ -16,15 +16,15 @@ export default class ActionRecord {
 
     // 监听回调的方式上传行为日志
     listener() {
-        // 上报错误时刻的前后日志
+        // 代码报错后，6s 后上报行为数据
         _support.events.on(ReportTypeEnum.CODE, () => {
             _support._report_delay_timer = setTimeout(() => {
                 console.info("======code====");
                 this.reportRecordData();
-            }, 10000);
+            }, 5000);
         })
 
-        // 立即上报
+        // 立即上报，避免用户关闭浏览器，导致行为未上报
         _support.events.on("report_song", () => {
             console.info("======report_song====");
             this.reportRecordData();
