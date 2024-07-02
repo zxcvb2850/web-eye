@@ -2,7 +2,7 @@ import ReactDOM from 'react-dom/client'
 import {HashRouter} from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import App from './App.tsx'
-import KingWebEye from '../../src/index';
+import KingWebEye from '../../src';
 import './index.css'
 
 console.info('---KingWebEye---', KingWebEye);

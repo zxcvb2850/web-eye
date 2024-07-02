@@ -31,6 +31,9 @@ export enum PerformanceEnum {
     CLS = "CLS",
 }
 
+// 未知错误类型
+export const UnKnown = "UnKnown";
+
 /**
  * 上报类型
  * */
@@ -44,6 +47,7 @@ export enum ReportTypeEnum {
     PROMISE = "promise",
     CODE = "code",
     RESOURCES = "resources",
+    OTHER = "other",
     WHITE_SCREEN = "whiteScreen",
 }
 
@@ -58,13 +62,34 @@ export enum NetworkErrorEnum {
     SUCCESS = "success",
 }
 
+
 /**
  * 枚举监听错误类型
  * */
 export enum ErrorTypeEnum {
     JS = "js", // JS 代码错误类型
-    SR = "source", // 资源错误
+    RS = "resources", // 资源错误 - 加载失败
     XML = "xml", // 请求错误
-    CS = "cors", // 资源错误
+    CS = "cors", // 请求错误 - 跨域
     REACT = "react" , // react ErrorBoundary 错误边界
+}
+
+/**
+ * 枚举性能评分
+ * */
+export enum RatingEnum {
+    GD = 'good',
+    NI = 'needs-improvement',
+    PR = 'poor',
+}
+
+/**
+ * 堆栈错误结构
+ * */
+export interface StackFrameFace {
+    source: string,
+    fileName: string,
+    lineno: number,
+    colno: number;
+    functionName?: string,
 }

@@ -49,8 +49,22 @@ function App() {
         bodyDom && bodyDom.append(image);
     }
 
-    const clickPromiseCatch = () => {
-        Promise.reject("---test promise reject---");
+    const clickPromiseCatch = async () => {
+        Promise.reject("promise reject");
+
+
+        const result = await promiseError();
+        console.info("===result===", result);
+
+        function promiseError(){
+            return new Promise((resolve, reject) => {
+                if (Math.random() > 0.5) {
+                    resolve("resolve");
+                } else {
+                    reject(new Error("reject"));
+                }
+            })
+        }
     }
 
     const clickCodeError = () => {

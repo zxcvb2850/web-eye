@@ -1,71 +1,80 @@
-import {_global, getErrorType, getMd5, getTimestamp, on} from "../utils";
-import {ErrorTypeEnum, ReportTypeEnum} from "../types";
+import {_global, getErrorType, getMd5, on, parseStackError} from "../utils";
+import {ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown} from "../types";
 
 export default class HandleListener {
-    private reportMap = new Map<string, number>();
-
     constructor() {
         this.windowError();
         this.rejectError();
     }
 
-    windowError() {
+    private windowError() {
         on(_global, "error", (event: ErrorEvent) => {
             if (this.adaptReact()) return true;
-            console.info("---event instanceof ErrorEvent---", event instanceof ErrorEvent);
-            if (getErrorType(event) === ErrorTypeEnum.SR) {
-                this.resourcesError(event);
-            } else if(getErrorType(event) === ErrorTypeEnum.JS) {
-                this.scriptCodeError(event);
+            const eventType = getErrorType(event);
+            if (eventType === ErrorTypeEnum.RS) {
+                // 资源加载异常
+                this.resourcesError(event, eventType);
+            } else if(eventType === ErrorTypeEnum.CS) {
+                // 跨域
+                this.resourcesError(event, eventType);
+            } else if (eventType === ErrorTypeEnum.JS) {
+                this.scriptCodeError(event, eventType);
             }
-            console.info("---metrics report---", {
-                type: ReportTypeEnum.CODE,
-                data: {event},
-            })
         }, true);
     }
 
     // Promise reject 错误监听
-    rejectError() {
-        on(window, "unhandledrejection", (event: PromiseRejectionEvent) => {
+    private rejectError() {
+        on(_global, "unhandledrejection", (event: PromiseRejectionEvent) => {
+            const errorContent: {msg: string, frames?: StackFrameFace[]} = {msg: UnKnown};
+            const stacks = parseStackError(event.reason);
+            if (stacks?.length) {
+                errorContent.msg = stacks[0].source;
+                errorContent.frames = stacks;
+            } else {
+                errorContent.msg = event.reason;
+            }
+            const id = getMd5(`${errorContent.msg}`);
             console.info("---metrics report---", {
                 type: ReportTypeEnum.PROMISE,
-                data: {event},
+                data: {
+                    id, ...errorContent,
+                    status: event?.reason.name || UnKnown,
+                },
             })
         });
     }
 
     // 资源加载错误
-    resourcesError(event: ErrorEvent) {
+    private resourcesError(event: ErrorEvent, type: ErrorTypeEnum) {
         const cTarget = event.target || event.srcElement
         const url = (cTarget as HTMLImageElement).src || (cTarget as HTMLAnchorElement).href;
         const localName = (cTarget as HTMLElement).localName;
         const id = getMd5(`${url}${localName}`);
-        const isReport = this.setReportRecord(id);
-        console.log("---error source---", id, isReport, url, localName);
+
+        console.info("---metrics report---", {
+            type: ReportTypeEnum.RESOURCES,
+            data: {type, id, url, localName},
+        })
     }
 
     // 代码执行错误
-    scriptCodeError(event: ErrorEvent) {
-        const {message, error, filename, lineno, colno} = event;
+    private scriptCodeError(event: ErrorEvent, type: ErrorTypeEnum) {
+        console.info("---script code error---", type);
+        const stacks = parseStackError(event.error);
+        const {message, filename, lineno, colno} = event;
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
-        const isReport = this.setReportRecord(id);
-        console.log("---error code---", id, isReport, event.message, event.filename, event.lineno, event.colno, event.error);
-    }
-
-    setReportRecord(id: string): boolean {
-        const nowTime = getTimestamp();
-        const oldTime = this.reportMap.get(id);
-        // 60s 内不重复上报
-        const isOk = !(oldTime && nowTime - oldTime < 60 * 1000);
-        if (isOk) {
-            this.reportMap.set(id, nowTime);
-        }
-        return isOk;
+        console.info("---metrics report---", {
+            type: ReportTypeEnum.CODE,
+            data: {
+                id, msg: message, frames: stacks,
+                status: event?.error?.name || UnKnown,
+            },
+        })
     }
 
     // 处理 react 开发环境会执行两次
-    adaptReact(): boolean {
+    private adaptReact(): boolean {
         if (((error) => (error.stack && error.stack.indexOf("invokeGuardedCallbackDev") >= 0))(new Error())) {
             return true;
         }

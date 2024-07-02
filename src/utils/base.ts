@@ -1,7 +1,7 @@
+import md5 from "crypto-js/md5";
 import {_global, isString} from "../utils";
-import {Callback, ErrorTypeEnum, IAnyObject} from "../types";
+import {Callback, ErrorTypeEnum, IAnyObject, StackFrameFace} from "../types";
 import logger from "../logger";
-import {md5} from "../lib/wasm_sdk_util";
 
 // 获取当前时间
 export const getTimestamp = (): number => {
@@ -123,7 +123,7 @@ export const getUuid = (): string => {
  */
 export const getErrorType = (event: ErrorEvent | Event) => {
     const isJsError = event instanceof ErrorEvent;
-    if (!isJsError) return ErrorTypeEnum.SR;
+    if (!isJsError) return ErrorTypeEnum.RS;
     return event.message === 'Script error.' ? ErrorTypeEnum.CS : ErrorTypeEnum.JS;
 };
 
@@ -132,8 +132,51 @@ export const getErrorType = (event: ErrorEvent | Event) => {
  * */
 export const getMd5 = (input: string): string => {
     if (isString(input)) {
-        return md5(input);
+        return md5(input).toString();
     }
     logger.warn("please pass in string type");
     return "";
+}
+
+const CHROME_IE_STACK_REGEXP = /^\s*at .*(\S+:\d+|\(native\))/m;
+
+// 正则表达式，用以解析堆栈split后得到的字符串
+const ERROR_CONTENT_LINE_REG =
+    /^\s*at (?:(.*?) ?\()?((?:file|https?|blob|chrome-extension|address|native|eval|webpack|<anonymous>|[-a-z]+:|.*bundle|\/).*?)(?::(\d+))?(?::(\d+))?\)?\s*$/i;
+
+// 限制只追溯10个
+const STACKS_LIMIT = 5;
+
+// 解析每一行
+export function parseStackLine(line: string): StackFrameFace | null {
+    const lineMatch = line.match(ERROR_CONTENT_LINE_REG);
+    if (!lineMatch) return null;
+    const fileName = lineMatch[2];
+    const functionName = lineMatch[1];
+    const lineno = parseInt(lineMatch[3], 10) || undefined;
+    const colno = parseInt(lineMatch[4], 10) || undefined;
+    if (!(lineno && colno)) return null;
+
+    return {colno, lineno, fileName, functionName, source: line};
+}
+
+/**
+ * 错误堆栈提取信息
+ * @param {any} error 错误信息
+ * @return {StackFrameFace[]} 错误堆栈
+ * */
+export function parseStackError(error: any): StackFrameFace[] {
+    const { stack } = error;
+    // 不符合堆栈错误的直接返回
+    if (!CHROME_IE_STACK_REGEXP.test(stack) || !stack?.length) return [];
+    const frames: any[] = [];
+    const stacks = error.stack.split('\n').filter((line: string) => !!line.match(ERROR_CONTENT_LINE_REG));
+    for (let i = 0; i < stacks.length; i++) {
+        if (i >= STACKS_LIMIT) break;
+        const frame = parseStackLine(stacks[i]);
+        if (frame) {
+            frames.push(frame);
+        }
+    }
+    return frames;
 }

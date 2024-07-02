@@ -5,7 +5,7 @@ import {
     getCacheData,
     getUuid,
     isObject,
-    localStorageUUID,
+    localStorageUUID, on,
     setCacheData,
     validateOptions
 } from "./utils";
@@ -18,12 +18,12 @@ import HistoryRouter from "./core/historyRouter";
 import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
-import wasmInit from "./lib/wasm_sdk_util";
 
 /**
  * 入口文件
  * */
 class KingWebEye {
+    protected _initialized = false; // 是否已经初始化
     public options: OptionsFace;
     public actionRecord: ActionRecord | null = null;
 
@@ -65,11 +65,15 @@ class KingWebEye {
         new HistoryRouter();
         // 全局监听错误
         new HandleListener();
-
-        wasmInit();
     }
 
     init(options: OptionsFace) {
+        if (this._initialized) {
+            logger.warn(`Already initialized`);
+            return;
+        }
+        this._initialized = true;
+
         if (!options.dsn) {
             logger.error(`dsn is must be set`);
             return;
@@ -109,6 +113,11 @@ class KingWebEye {
 
         // 请求监听
         new HttpProxy();
+
+        // 浏览器关闭/刷新前触发的回调
+        on(_global, "beforeunload", (event: Event) => {
+            console.error("===========================")
+        })
     }
 
     setOptions(key: keyof OptionsFace, value: OptionsFace[keyof OptionsFace]) {
