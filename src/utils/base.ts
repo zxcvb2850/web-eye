@@ -8,10 +8,6 @@ export const getTimestamp = (): number => {
     return new Date().getTime()
 }
 
-// 记录最后一次的路由
-export const localStorageRouter = "_king_web_eye_router_";
-// 保存用户的UUID
-export const localStorageUUID = "_king_web_eye_uuid_";
 // 分割
 const splitStr = "|||";
 
@@ -44,19 +40,6 @@ export const afterLoad = (callback: Callback): void => {
         window.addEventListener('pageshow', callback, { once: true, capture: true });
     }
 };
-
-/**
- * GET请求地址获取参数
- * */
-export const getDomainFromUrl = (url: string): IAnyObject => {
-    const str = "/x?a=1&b=2";
-
-    const domain = new URL(url);
-
-    console.info("===get url===", domain);
-
-    return {};
-}
 
 /**
  * 获取域名相关数据
@@ -188,15 +171,18 @@ export function throttle<T extends (...args: any[]) => void>(func: T, limit: num
     let lastFunc: ReturnType<typeof setTimeout>;
     let lastRan: number;
 
-    return function (this:any, ...args){
-        if (lastRan) {
+    return function (this:any, ...args: Parameters<T>){
+        if (!lastRan) {
             func.apply(this, args);
             lastRan = getTimestamp();
         } else {
             clearTimeout(lastFunc);
             lastFunc = setTimeout(() => {
-                func.apply(this, args);
-            }, limit);
+                if (getTimestamp() - lastRan >= limit) {
+                    func.apply(this, args);
+                    lastRan = getTimestamp();
+                }
+            }, limit - (getTimestamp() - lastRan));
         }
     } as T;
 }

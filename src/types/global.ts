@@ -1,7 +1,7 @@
 import {EventsBusFace, IAnyObject} from "./base";
 
 export interface Window {
-    __king_web_eye__: KingWebEye;
+    __king_web_eye__: any;
     screen: any;
     document: Document;
     addEventListener: EventListener;
@@ -24,7 +24,8 @@ export interface KingWebEye {
     events: EventsBusFace;
     report: any;
     _loop_while_screen_timer_: any; // 白屏轮询定时器
-    _report_delay_timer: any; // 延迟上报定时器
+    _record_delay_timer: any; // 行为延迟上报定时器
+    _click_delay_timer: any; // 点击延迟上报定时器
 }
 
 export interface OptionsFace {
@@ -35,9 +36,10 @@ export interface OptionsFace {
     isPlayback?: boolean;
     debug?: boolean;
     whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
-    isActionRecord?: boolean;
-    maxRecordLimit?: number; // 记录数量
+    isActionRecord?: boolean; // 是否记录行为
+    maxRecordLimit?: number; // 记录行为数量
     isRecordClick?: boolean; // 是否记录点击事件
+    maxClickLimit?: number; // 记录点击数量
 }
 
 // 自定义参数

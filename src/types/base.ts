@@ -93,3 +93,13 @@ export interface StackFrameFace {
     colno: number;
     functionName?: string,
 }
+
+/**
+ * 日志工具类，用于打印日志
+ * */
+export enum LOG_LEVEL_ENUM {
+    DEBUG = 1,
+    LOG = 2,
+    WARN = 3,
+    ERROR = 4,
+}

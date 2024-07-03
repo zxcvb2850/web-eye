@@ -1,3 +1,5 @@
+import logger from "../logger";
+
 /**
  * 储存日志
  * */
@@ -19,25 +21,30 @@ export class WebIndexedDB {
     }
 
     private init() {
+        if (this.db) {
+            logger.warn(`Already initialized`);
+            return;
+        }
         const request = indexedDB.open(this.dbName, this.dbVersion);
 
-        request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-            const db = (event.target as IDBOpenDBRequest).result;
+        request.onupgradeneeded = () => {
+            const db = request.result;
             if (!db.objectStoreNames.contains(this.storeName)) {
-                db.createObjectStore(this.storeName, { keyPath: 'id', autoIncrement: true });
+                db.createObjectStore(this.storeName, {keyPath: 'id', autoIncrement: true});
             }
         };
 
-        request.onsuccess = (event: Event) => {
-            this.db = (event.target as IDBOpenDBRequest).result;
+        request.onsuccess = () => {
+            this.db = request.result;
         };
 
-        request.onerror = (event: Event) => {
-            console.error('IndexedDB error:', (event.target as IDBOpenDBRequest).error);
+        request.onerror = () => {
+            logger.error('IndexedDB error:', request.error);
         };
     }
 
-    public addData(data: any): Promise<void> {
+    // 添加数据
+    public addData(data: any): Promise<number> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 reject(new Error('Database is not initialized'));
@@ -54,7 +61,7 @@ export class WebIndexedDB {
                 const countRequest = store.count();
                 countRequest.onsuccess = () => {
                     const count = countRequest.result;
-                    console.info("----count----", count);
+                    resolve(count);
                     if (this.maxCount > 0 && count >= this.maxCount) {
                         const getFirstKeyRequest = store.openCursor();
                         getFirstKeyRequest.onsuccess = (event) => {
@@ -69,8 +76,6 @@ export class WebIndexedDB {
                 countRequest.onerror = () => {
                     reject(new Error('Failed to count the entries'));
                 };
-
-                resolve();
             };
 
             addRequest.onerror = () => {
@@ -79,7 +84,31 @@ export class WebIndexedDB {
         });
     }
 
-    public clearData(): Promise<void> {
+    // 获取数据
+    public getAllData(): Promise<any> {
+        return new Promise((resolve, reject) => {
+            if (!this.db) {
+                reject(new Error('Database is not initialized'));
+                return;
+            }
+
+            const transaction = this.db.transaction([this.storeName], 'readwrite');
+            const store = transaction.objectStore(this.storeName);
+
+            const getAllRequest = store.getAll();
+
+            getAllRequest.onsuccess = (data) => {
+                resolve(getAllRequest.result);
+            }
+
+            getAllRequest.onerror = () => {
+                reject(new Error('Failed to getAll data'));
+            }
+        })
+    }
+
+    // 删除数据
+    public clearData(): Promise<number> {
         return new Promise((resolve, reject) => {
             if (!this.db) {
                 reject(new Error('Database is not initialized'));
@@ -91,7 +120,7 @@ export class WebIndexedDB {
             const clearRequest = store.clear();
 
             clearRequest.onsuccess = () => {
-                resolve();
+                resolve(1);
             };
 
             clearRequest.onerror = () => {

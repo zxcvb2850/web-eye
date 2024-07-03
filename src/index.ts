@@ -9,8 +9,8 @@ import {
     setCacheData,
     validateOptions
 } from "./utils";
-import {OptionsFace, ParamsFace} from "./types";
-import logger, {LOG_LEVEL_ENUM} from "./logger";
+import {LOG_LEVEL_ENUM, OptionsFace, ParamsFace} from "./types";
+import logger from "./logger";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import WebVitals from "./core/webVitals";
 import HttpProxy from "./core/httpProxy";
@@ -19,23 +19,26 @@ import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
 import OtherListener from "./core/otherListener";
+import ReportLogs from "./core/reportLogs";
 
 /**
  * 入口文件
  * */
-class KingWebEye {
+class KingWebEye extends ReportLogs {
     protected _initialized = false; // 是否已经初始化
     public options: OptionsFace;
-    public actionRecord: ActionRecord | null = null;
+    private actionRecord: ActionRecord | null = null;
 
     constructor() {
+        super();
         this.options = {
             dsn: "",
             appid: "",
-            level: LOG_LEVEL_ENUM.LOG,
+            level: LOG_LEVEL_ENUM.DEBUG,
             isConsole: true,
             maxRecordLimit: 100,
             isRecordClick: true,
+            maxClickLimit: 20,
         };
 
         _support.options = this.options;
@@ -112,9 +115,12 @@ class KingWebEye {
         }
         validateOptions(options.maxRecordLimit, "maxRecordLimit", "number", true) && (this.options.maxRecordLimit = options.maxRecordLimit)
         validateOptions(options.isRecordClick, "isRecordClick", "boolean", true) && (this.options.isRecordClick = options.isRecordClick)
+        validateOptions(options.maxClickLimit, "maxClickLimit", "number", true) && (this.options.maxClickLimit = options.maxClickLimit)
 
         // 日志初始化
         logger.init();
+
+        logger.log("----------------init----------------");
 
         // 请求监听
         new HttpProxy();

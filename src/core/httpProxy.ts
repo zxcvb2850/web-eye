@@ -9,6 +9,9 @@ import {
 } from "../utils";
 import {IAnyObject, NetworkErrorEnum, ReportTypeEnum} from "../types";
 
+// 由于隐私问题，需要过了部分字段
+const headersWhite = ["Accept", "Authorization", "Appsubcode", "Appcode"]; // 过滤白名单
+
 export default class HttpProxy {
     constructor() {
         this.proxyFetch();
@@ -42,12 +45,18 @@ export default class HttpProxy {
                 const headersObj: { [key: string]: string } = {};
                 if (headers instanceof Headers) {
                     headers.forEach((value, key) => {
-                        headersObj[formatHeadersKey(key)] = value;
+                        const hKey = formatHeadersKey(key);
+                        if (headersWhite.indexOf(hKey) !== -1) {
+                            headersObj[hKey] = value;
+                        }
                     });
                 } else if (headers) {
                     for (const key in headers) {
                         if (headers.hasOwnProperty(key)) {
-                            headersObj[formatHeadersKey(key)] = headers[key];
+                            const hKey = formatHeadersKey(key);
+                            if (headersWhite.indexOf(hKey) !== -1) {
+                                headersObj[hKey] = headers[key];
+                            }
                         }
                     }
                 }
@@ -129,8 +138,11 @@ export default class HttpProxy {
                     // @ts-ignore
                     this.king_web_eye_xhr.headers = {};
                 }
-                // @ts-ignore
-                this.king_web_eye_xhr.headers[formatHeadersKey(args[0])] = args[1];
+                const hKey = formatHeadersKey(args[0]);
+                if (headersWhite.indexOf(hKey) !== -1) {
+                    // @ts-ignore
+                    this.king_web_eye_xhr.headers[hKey] = args[1];
+                }
                 originalHeader.apply(this, args);
             }
         })

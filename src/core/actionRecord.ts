@@ -1,6 +1,6 @@
 import {record, EventType} from "rrweb";
 import {_support, isNumber} from "../utils";
-import {ReportTypeEnum} from "../types";
+import {LOG_LEVEL_ENUM, ReportTypeEnum} from "../types";
 
 export default class ActionRecord {
     private curRecord: ReturnType<typeof record>;
@@ -18,15 +18,13 @@ export default class ActionRecord {
     listener() {
         // 代码报错后，6s 后上报行为数据
         _support.events.on(ReportTypeEnum.CODE, () => {
-            _support._report_delay_timer = setTimeout(() => {
-                console.info("======code====");
+            _support._record_delay_timer = setTimeout(() => {
                 this.reportRecordData();
             }, 5000);
         })
 
         // 立即上报，避免用户关闭浏览器，导致行为未上报
-        _support.events.on("report_song", () => {
-            console.info("======report_song====");
+        _support.events.on("report_record_song", () => {
             this.reportRecordData();
         })
     }
@@ -35,8 +33,7 @@ export default class ActionRecord {
     startRecord() {
         if (
             _support.options?.isActionRecord
-            && isNumber(_support.options.maxRecordLimit)
-            && _support.options.maxRecordLimit > 0
+            && _support.options?.maxRecordLimit! > 0
         ) {
             const that = this;
             this.curRecord = record({
@@ -48,8 +45,9 @@ export default class ActionRecord {
                     } else {
                         that.list.push(event);
                     }
-                    if (that.list.length > (_support.options.maxRecordLimit as number)) {
-                        that.list.shift();
+                    const len = that.list.length;
+                    if (len > _support.options.maxRecordLimit!) {
+                        that.list = that.list.splice(len - _support.options.maxRecordLimit!)
                     }
                 },
                 sampling: {
@@ -63,14 +61,19 @@ export default class ActionRecord {
         }
     }
 
+    // 停止屏幕录制
     stopRecord() {
         this.curRecord && this.curRecord();
-        this.reportRecordData();
+
+        // 开发环境，停止录制就上报
+        if (_support.options.level === LOG_LEVEL_ENUM.DEBUG) {
+            this.reportRecordData();
+        }
     }
 
     reportRecordData(){
-        clearTimeout(_support._report_delay_timer);
-        _support._report_delay_timer = null;
+        clearTimeout(_support._record_delay_timer);
+        _support._record_delay_timer = null;
         window.localStorage.setItem("test-record", JSON.stringify([this.metaSnapshot, this.fullSnapshot, ...this.list]));
         this.list = [];
     }
