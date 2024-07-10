@@ -49,6 +49,7 @@ export enum ReportTypeEnum {
     RESOURCES = "resources",
     OTHER = "other",
     WHITE_SCREEN = "whiteScreen",
+    CUSTOM = "custom",
 }
 
 /**
@@ -102,4 +103,22 @@ export enum LOG_LEVEL_ENUM {
     LOG = 2,
     WARN = 3,
     ERROR = 4,
+}
+
+/**
+ * SDK捕捉上报字段
+ * */
+export interface ReportSystemDataFace {
+    type: ReportTypeEnum;
+
+    data: IAnyObject;
+}
+
+/**
+ * 自定义上报字段
+ * */
+export interface ReportCustomDataFace {
+    event: string | number;
+
+    [key: string]: any;
 }

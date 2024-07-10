@@ -2,6 +2,7 @@ import {EventsBusFace, IAnyObject} from "./base";
 
 export interface Window {
     __king_web_eye__: any;
+    navigator: Navigator,
     screen: any;
     document: Document;
     addEventListener: EventListener;
@@ -40,6 +41,7 @@ export interface OptionsFace {
     maxRecordLimit?: number; // 记录行为数量
     isRecordClick?: boolean; // 是否记录点击事件
     maxClickLimit?: number; // 记录点击数量
+    filterHttpUrl?: string[]; // 过滤需要上报的白名单
 }
 
 // 自定义参数

@@ -1,10 +1,15 @@
-import {_global, _support, on, throttle} from "../utils";
+import { _global, _support, getTimestamp, on, throttle, zip } from '../utils';
 import {ReportTypeEnum} from "../types";
+import report from '../report'
 
 interface ClickFace {
     id: string | null;
     className: (string | null)[];
     tagName: string;
+    x: number;
+    y: number;
+    time: number;
+    url: string;
 }
 
 export default class OtherListener {
@@ -21,12 +26,22 @@ export default class OtherListener {
         // 代码报错后，6s 后上报行为数据
         _support.events.on(ReportTypeEnum.CODE, () => {
             _support._click_delay_timer = setTimeout(() => {
-                console.info("---click 上报---", this.clicks);
+                console.info("===zip===", this.clicks);
+                report({
+                    type: ReportTypeEnum.CLICK,
+                    data: zip(this.clicks),
+                });
+                this.clicks = [];
             }, 5000);
         })
 
+        // 页面被关闭，则立即上报
         _support.events.on("report_click_song", () => {
-            console.info("---立即上报---", this.clicks);
+            report({
+                type: ReportTypeEnum.CLICK,
+                data: this.clicks,
+            }, true)
+            this.clicks = [];
         })
     }
 
@@ -63,7 +78,11 @@ export default class OtherListener {
                 id: target.id,
                 className: Array.from(target.classList),
                 tagName: target.tagName,
-            })
+                x: event?.clientX || 0,
+                y: event?.clientY || 0,
+                time: getTimestamp(),
+                url: _global.location.href,
+            });
             const len = this.clicks.length;
             if (len > _support.options.maxClickLimit!) {
                 this.clicks = this.clicks.splice(len - _support.options.maxClickLimit!)

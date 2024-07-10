@@ -5,11 +5,11 @@ import {
     getCacheData,
     getUuid,
     isObject,
-    localStorageUUID, on,
+    localStorageUUID,
     setCacheData,
     validateOptions
 } from "./utils";
-import {LOG_LEVEL_ENUM, OptionsFace, ParamsFace} from "./types";
+import { LOG_LEVEL_ENUM, OptionsFace, ParamsFace, ReportCustomDataFace } from './types';
 import logger from "./logger";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import WebVitals from "./core/webVitals";
@@ -19,18 +19,17 @@ import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
 import OtherListener from "./core/otherListener";
-import ReportLogs from "./core/reportLogs";
+import report from './report'
 
 /**
  * 入口文件
  * */
-class KingWebEye extends ReportLogs {
+class KingWebEye {
     protected _initialized = false; // 是否已经初始化
     public options: OptionsFace;
     private actionRecord: ActionRecord | null = null;
 
     constructor() {
-        super();
         this.options = {
             dsn: "",
             appid: "",
@@ -39,6 +38,7 @@ class KingWebEye extends ReportLogs {
             maxRecordLimit: 100,
             isRecordClick: true,
             maxClickLimit: 20,
+            filterHttpUrl: [],
         };
 
         _support.options = this.options;
@@ -160,6 +160,10 @@ class KingWebEye extends ReportLogs {
             return false;
         }
         _support.params[key] = value;
+    }
+
+    sendCustom (data: ReportCustomDataFace) {
+        report.sendCustom(data);
     }
 }
 

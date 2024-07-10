@@ -3,6 +3,7 @@
  * */
 import {_global, _support, getTimestamp, on} from "../utils";
 import {ReportTypeEnum} from "../types";
+import report from '../report'
 
 const maxLoopCount = 10;
 
@@ -10,7 +11,6 @@ export default class WhiteScreen {
     public startTime = getTimestamp();
     public loopCount = 0;
     constructor() {
-        console.info("+++++++++++++++++++++")
         // 页面加载完毕
         if (document.readyState === 'complete') {
             this.sampleComparison();
@@ -86,12 +86,15 @@ export default class WhiteScreen {
     // 白屏检测返回状态
     whiteScreenCheck (status: boolean){
         const now = getTimestamp();
-        console.info("---metrics report---", {
-            type: ReportTypeEnum.WHITE_SCREEN,
-            data: {
-                status,
-                time: now - this.startTime
-            }
-        });
+
+        if (status) {
+            report({
+               type: ReportTypeEnum.WHITE_SCREEN,
+               data: {
+                   status,
+                   time: now - this.startTime
+               }
+           })
+        }
     }
 }

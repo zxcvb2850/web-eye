@@ -1,5 +1,6 @@
 import {_global, _support, getErrorType, getMd5, on, parseStackError} from "../utils";
 import {ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown} from "../types";
+import report from '../report'
 
 export default class HandleListener {
     constructor() {
@@ -35,13 +36,14 @@ export default class HandleListener {
                 errorContent.msg = event.reason;
             }
             const id = getMd5(`${errorContent.msg}`);
-            console.info("---metrics report---", {
+
+            report({
                 type: ReportTypeEnum.PROMISE,
                 data: {
                     id, ...errorContent,
                     status: event?.reason.name || UnKnown,
                 },
-            })
+            });
         });
     }
 
@@ -52,15 +54,14 @@ export default class HandleListener {
         const localName = (cTarget as HTMLElement).localName;
         const id = getMd5(`${url}${localName}`);
 
-        console.info("---metrics report---", {
+        report({
             type: ReportTypeEnum.RESOURCES,
             data: {type, id, url, localName},
-        })
+        });
     }
 
     // 代码执行错误
     private scriptCodeError(event: ErrorEvent, type: ErrorTypeEnum) {
-        console.info("---script code error---", type);
         const stacks = parseStackError(event.error);
         const {message, filename, lineno, colno} = event;
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
@@ -68,13 +69,13 @@ export default class HandleListener {
         // 发送事件
         _support.events.emit(ReportTypeEnum.CODE);
 
-        console.info("---metrics report---", {
+        report({
             type: ReportTypeEnum.CODE,
             data: {
                 id, msg: message, frames: stacks,
                 status: event?.error?.name || UnKnown,
             },
-        })
+        });
     }
 
     // 处理 react 开发环境会执行两次

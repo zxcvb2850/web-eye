@@ -34,6 +34,13 @@ function App() {
         })
             .then(res => res.text())
             .then(res => console.info("---res---", res));*/
+
+        KingWebEye.sendCustom({
+            event: "test",
+            data: "xxxxxxxxxxxxxxx",
+            a: "a",
+            b: 1
+        });
     }
 
     const clickLoadSourceError = () => {

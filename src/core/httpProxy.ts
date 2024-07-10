@@ -1,13 +1,14 @@
 import {
-    _global,
+    _global, _support,
     formatHeadersKey,
     getDomainUrl,
     getQueryParams,
-    getTimestamp, on,
+    getTimestamp, on, parseStackError,
     parseUrlEncodedBody,
     replaceOriginal
-} from "../utils";
+} from '../utils';
 import {IAnyObject, NetworkErrorEnum, ReportTypeEnum} from "../types";
+import report from '../report'
 
 // 由于隐私问题，需要过了部分字段
 const headersWhite = ["Accept", "Authorization", "Appsubcode", "Appcode"]; // 过滤白名单
@@ -20,6 +21,7 @@ export default class HttpProxy {
 
     // 重写 fetch
     proxyFetch() {
+        const that = this;
         replaceOriginal(_global, 'fetch', (originalFetch) => {
             return function (input: RequestInfo, config?: RequestInit) {
                 const startTime = getTimestamp();
@@ -67,7 +69,7 @@ export default class HttpProxy {
                     params = getQueryParams(requestUrl);
                 } else if (method === 'POST' || method === 'PUT') {
                     const contentType = headersObj['Content-Type'];
-                    if (contentType?.includes('application/x-www-form-urlencoded')) {
+                    if (contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
                         params = parseUrlEncodedBody(body);
                     } else {
                         try {
@@ -82,24 +84,32 @@ export default class HttpProxy {
 
                 return originalFetch.apply(_global, [input, {config}])
                     .then((res: Response) => {
-                        const endTime = getTimestamp();
-                        const time = endTime - startTime;
-                        console.info("---metrics report---", {
-                            type: ReportTypeEnum.FETCH,
-                            data: {
-                                status: NetworkErrorEnum.SUCCESS,
-                                url: `${domain.origin}${domain.pathname}`,
-                                method,
-                                headers: headersObj,
-                                params,
-                                time,
-                            }
+                        const clone = res.clone();
+                        clone.text().then(() => {
+                            if(that.isFilterHttpUrl(requestUrl)) return;
+
+                            const endTime = getTimestamp();
+                            const time = endTime - startTime;
+
+                            report({
+                                type: ReportTypeEnum.FETCH,
+                                data: {
+                                    status: NetworkErrorEnum.SUCCESS,
+                                    url: `${domain.origin}${domain.pathname}`,
+                                    method,
+                                    headers: headersObj,
+                                    params,
+                                    time,
+                                }
+                            })
                         })
                         return res;
                     }, (err: Error) => {
+                        if(that.isFilterHttpUrl(requestUrl)) return;
+
                         const endTime = getTimestamp();
                         const time = endTime - startTime;
-                        console.info("---metrics report---", {
+                        report({
                             type: ReportTypeEnum.FETCH,
                             data: {
                                 status: NetworkErrorEnum.SUCCESS,
@@ -108,6 +118,7 @@ export default class HttpProxy {
                                 headers: headersObj,
                                 params,
                                 time,
+                                err: parseStackError(err),
                             }
                         })
                         throw err;
@@ -118,6 +129,7 @@ export default class HttpProxy {
 
     // 重写 XMLHttpRequest
     proxyXmlHttp() {
+        const that = this;
         const originalXHRProto = _global.XMLHttpRequest.prototype;
 
         replaceOriginal(originalXHRProto, 'open', (originalOpen) => {
@@ -155,8 +167,8 @@ export default class HttpProxy {
                 if (method === 'GET') {
                     params = getQueryParams(url);
                 } else if (method === 'POST' || method === 'PUT') {
-                    const contentType = headers['Content-Type'] || {};
-                    if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+                    const contentType = headers['Content-Type'];
+                    if (contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
                         params = parseUrlEncodedBody(args[0] as string);
                     } else {
                         try {
@@ -169,10 +181,11 @@ export default class HttpProxy {
                 }
                 const domain = getDomainUrl(url);
                 on(this, "loadend", () => {
+                    if (that.isFilterHttpUrl(url)) return;
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
 
-                    console.info("---metrics report---", {
+                    report({
                         type: ReportTypeEnum.XHR,
                         data: {
                             status: NetworkErrorEnum.SUCCESS,
@@ -185,9 +198,12 @@ export default class HttpProxy {
                     })
                 });
                 on(this, "error", (err) => {
+                    if (that.isFilterHttpUrl(url)) return;
+
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
-                    console.info("---metrics report---", {
+
+                    report({
                         type: ReportTypeEnum.XHR,
                         data: {
                             status: NetworkErrorEnum.ERROR,
@@ -196,13 +212,18 @@ export default class HttpProxy {
                             headers,
                             params,
                             time,
-                        }
+                        },
                     })
-                    console.error("XHR err", err);
                 })
 
                 originalSend.apply(this, args);
             }
         });
+    }
+
+    // 过滤上报域名报错，过滤用户配置域名
+    isFilterHttpUrl(url: string): boolean {
+        return url.indexOf(_support.options.dsn) !== -1
+        || _support.options?.filterHttpUrl?.indexOf(url) === -1
     }
 }

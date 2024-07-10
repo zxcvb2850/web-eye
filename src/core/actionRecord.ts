@@ -25,7 +25,7 @@ export default class ActionRecord {
 
         // 立即上报，避免用户关闭浏览器，导致行为未上报
         _support.events.on("report_record_song", () => {
-            this.reportRecordData();
+            this.reportRecordData(true);
         })
     }
 
@@ -71,7 +71,7 @@ export default class ActionRecord {
         }
     }
 
-    reportRecordData(){
+    reportRecordData(isSong = false){
         clearTimeout(_support._record_delay_timer);
         _support._record_delay_timer = null;
         window.localStorage.setItem("test-record", JSON.stringify([this.metaSnapshot, this.fullSnapshot, ...this.list]));
