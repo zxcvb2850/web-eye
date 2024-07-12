@@ -50,20 +50,20 @@ class KingWebEye {
         // 浏览器指纹
         const {value} = getCacheData(localStorageUUID);
         if (value) {
-            _support.params["visitorId"] = value;
+            _support["visitorId"] = value;
         } else {
             FingerprintJS.load()
                 .then(fp => fp.get())
                 .then(result => {
                     if (result?.visitorId) {
                         setCacheData(localStorageUUID, result.visitorId);
-                        _support.params["visitorId"] = result.visitorId;
+                        _support["visitorId"] = result.visitorId;
                     }
                 });
         }
         // 本次uuid
         const uuid = getUuid();
-        if (uuid) _support.params["uuid"] = uuid;
+        if (uuid) _support["uuid"] = uuid;
 
         // WEB性能监听
         new WebVitals();

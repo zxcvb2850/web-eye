@@ -20,6 +20,8 @@ export interface KingWebEye {
     name: string;
     version: string;
     devices: any;
+    visitorId: string; // 浏览器指纹
+    uuid: string; // 本次启动的唯一值，避免用户使用多窗口的方式
     options: OptionsFace;
     params: IAnyObject,
     events: EventsBusFace;
@@ -46,7 +48,5 @@ export interface OptionsFace {
 
 // 自定义参数
 export interface ParamsFace {
-    visitorId: string; // 浏览器指纹
-    uuid: string; // 本次启动的唯一值，避免用户使用多窗口的方式
     [key: string]: any; // 自定义额外字段
 }

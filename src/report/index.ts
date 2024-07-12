@@ -17,11 +17,11 @@ class ReportLogs {
       this.reportSendBeacon(data);
     } else {
       if (data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY) {
-        this.requestIdleCallback(() => this.reportSendImg(data));
+        // this.requestIdleCallback(() => this.reportSendBeacon(data));
       } else if (_global.hasOwnProperty('fetch')) {
-        this.requestIdleCallback(() => this.reportSendFetch(data));
+        // this.requestIdleCallback(() => this.reportSendFetch(data));
       } else {
-        this.requestIdleCallback(() => this.reportSendXhr(data));
+        // this.requestIdleCallback(() => this.reportSendXhr(data));
       }
     }
   }
@@ -52,9 +52,12 @@ class ReportLogs {
   private sendReportParams(data: ReportSystemDataFace): string {
     const reportParams = {
       type: data.type,
+      appId: _support.options.appid,
+      visitorId: _support.visitorId,
+      uuid: _support.uuid,
       data: this.getParamsString(data.data),
       params: this.getParamsString(_support.params),
-      device: this.getParamsString(_support.devices),
+      device: this.getParamsString({ ..._support.devices, sdkVersion: _support.version }),
       path: _global.location.href,
     }
 
@@ -95,7 +98,11 @@ class ReportLogs {
     }
   }
 
-  // image 方式上报
+  /**
+   * image 方式上报
+   *   少量数据上报时可以采用此方式
+   *   不能自定义header
+   * */
   private reportSendImg(data: ReportSystemDataFace) {
     try {
       const image = new Image();
@@ -105,10 +112,16 @@ class ReportLogs {
     }
   }
 
-  // sendBeacon 方式上报
+  /**
+   * sendBeacon 方式上报
+   *  只能上报少量数据，点击事件，屏幕绘制不建议走次方式上报
+   *  不能自定义header
+   * */
   private reportSendBeacon(data: ReportSystemDataFace) {
     try {
-      _global.navigator.sendBeacon(`${_support.options.dsn}/beacon`, JSON.stringify({ data: this.sendReportParams(data) }));
+      const formData = new FormData();
+      formData.append('data', this.sendReportParams(data));
+      _global.navigator.sendBeacon(`${_support.options.dsn}/beacon`, formData);
     } catch (err) {
       logger.error('---beacon 上报失败---', err);
     }

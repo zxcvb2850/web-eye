@@ -7,8 +7,8 @@ import './index.css'
 
 console.info('---KingWebEye---', KingWebEye);
 KingWebEye.init({
-    dsn: "http://test-web-eye",
-    appid: "test-web-eye",
+    dsn: "http://127.0.0.1:4567/api/report-logs",
+    appid: "6690936fa7816a4cca157261",
     isPlayback: false,
     whiteScreenDoms: ["html", "body", "#root"],
     isActionRecord: true, // 是否开启屏幕动作录制

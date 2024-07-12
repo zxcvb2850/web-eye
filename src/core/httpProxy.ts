@@ -81,8 +81,7 @@ export default class HttpProxy {
                     }
                 }
 
-
-                return originalFetch.apply(_global, [input, {config}])
+                return originalFetch.apply(_global, [input, config])
                     .then((res: Response) => {
                         const clone = res.clone();
                         clone.text().then(() => {
@@ -119,6 +118,7 @@ export default class HttpProxy {
                                 params,
                                 time,
                                 err: parseStackError(err),
+                                isCross: that.isCrossOriginFetchError(err),
                             }
                         })
                         throw err;
@@ -182,6 +182,7 @@ export default class HttpProxy {
                 const domain = getDomainUrl(url);
                 on(this, "loadend", () => {
                     if (that.isFilterHttpUrl(url)) return;
+
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
 
@@ -212,6 +213,7 @@ export default class HttpProxy {
                             headers,
                             params,
                             time,
+                            isCross: that.isCrossOriginFetchError(err),
                         },
                     })
                 })
@@ -225,5 +227,15 @@ export default class HttpProxy {
     isFilterHttpUrl(url: string): boolean {
         return url.indexOf(_support.options.dsn) !== -1
         || _support.options?.filterHttpUrl?.indexOf(url) === -1
+    }
+
+    // fetch 判断是否跨域
+    isCrossOriginFetchError(error: Error) {
+        return error.message === 'Failed to fetch' || error.message === 'Network request failed';
+    }
+
+    // xhr 判断是否跨域
+    isCrossOriginXhrError(xhr: XMLHttpRequest) {
+        return xhr.status === 0 && xhr.statusText === '' && xhr.getAllResponseHeaders() === '';
     }
 }
