@@ -1,5 +1,5 @@
-import { _global, _support, isNumber, isString } from '../utils';
-import { Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum } from '../types'
+import {_global, _support, isNumber, isString} from '../utils';
+import {Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum} from '../types'
 import logger from '../logger'
 
 class ReportLogs {
@@ -16,18 +16,16 @@ class ReportLogs {
     if (data.type === ReportTypeEnum.PERFORMANCE || isBeacon) {
       this.reportSendBeacon(data);
     } else {
-      if (data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY) {
-        // this.requestIdleCallback(() => this.reportSendBeacon(data));
-      } else if (_global.hasOwnProperty('fetch')) {
-        // this.requestIdleCallback(() => this.reportSendFetch(data));
+      if (data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
+        this.requestIdleCallback(() => this.reportSendBeacon(data));
       } else {
-        // this.requestIdleCallback(() => this.reportSendXhr(data));
+        this.requestIdleCallback(() => this.reportSendFetch(data));
       }
     }
   }
 
   // 自定义日志上报
-  sendCustom(data: ReportCustomDataFace) {
+  sendCustom(data: ReportCustomDataFace, reportType = 'fetch') {
     if (!(isString(data.event) || isNumber(data.event))) {
       logger.warn(`custom report event typeof is string or number`);
       return;
@@ -72,15 +70,19 @@ class ReportLogs {
   // fetch 方式上报
   private reportSendFetch(data: ReportSystemDataFace) {
     try {
-      fetch(`${_support.options.dsn}/fetch`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ data: this.sendReportParams(data) }),
-      }).catch(err => {
-        logger.error('---fetch 上报失败---', err);
-      })
+      if (_global.hasOwnProperty('fetch')) {
+        fetch(`${_support.options.dsn}/fetch`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ data: this.sendReportParams(data) }),
+        }).catch(err => {
+          logger.error('---fetch 上报失败---', err);
+        })
+      } else {
+        this.reportSendXhr(data);
+      }
     } catch (err) {
       logger.error('---fetch 上报失败---', err);
     }
@@ -119,9 +121,14 @@ class ReportLogs {
    * */
   private reportSendBeacon(data: ReportSystemDataFace) {
     try {
-      const formData = new FormData();
-      formData.append('data', this.sendReportParams(data));
-      _global.navigator.sendBeacon(`${_support.options.dsn}/beacon`, formData);
+      if (!!navigator?.sendBeacon && !_global?.isBlockBeacon) {
+        const beaconSent = navigator.sendBeacon(`${_support.options.dsn}/beacon`, JSON.stringify({data: this.sendReportParams(data)}));
+        if (!beaconSent) {
+          this.reportSendFetch(data);
+        }
+      } else {
+        this.reportSendFetch(data);
+      }
     } catch (err) {
       logger.error('---beacon 上报失败---', err);
     }

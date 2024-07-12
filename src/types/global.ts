@@ -2,6 +2,7 @@ import {EventsBusFace, IAnyObject} from "./base";
 
 export interface Window {
     __king_web_eye__: any;
+    isBlockBeacon: boolean; // sendBeacon 是否被拦截
     navigator: Navigator,
     screen: any;
     document: Document;
