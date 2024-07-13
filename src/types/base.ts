@@ -38,18 +38,19 @@ export const UnKnown = "UnKnown";
  * 上报类型
  * */
 export enum ReportTypeEnum {
-    PERFORMANCE = "performance",
-    FETCH = "fetch",
-    XHR = "xhr",
-    CLICK = "click",
-    HISTORY = "history",
-    HASHCHANGE = "hashchange",
-    PROMISE = "promise",
-    CODE = "code",
-    RESOURCES = "resources",
-    OTHER = "other",
-    WHITE_SCREEN = "whiteScreen",
-    CUSTOM = "custom",
+    PERFORMANCE = "performance", // 性能检测
+    FETCH = "fetch", // fetch 请求
+    XHR = "xhr", // xhr 请求
+    CLICK = "click", // 点击事件
+    HISTORY = "history", // 路由变化
+    HASHCHANGE = "hashchange", // hash 变化
+    PROMISE = "promise", // promise
+    CODE = "code", // 代码错误
+    RESOURCES = "resources", // 资源异常
+    WHITE_SCREEN = "whiteScreen", // 白屏检测
+    ACTION_RECORD = "action_record", // 录屏
+    OTHER = "other", // 其他，预留类型
+    CUSTOM = "custom", // 自定义
 }
 
 /**
@@ -111,7 +112,7 @@ export enum LOG_LEVEL_ENUM {
 export interface ReportSystemDataFace {
     type: ReportTypeEnum;
 
-    data: IAnyObject;
+    data: IAnyObject | string;
 }
 
 /**

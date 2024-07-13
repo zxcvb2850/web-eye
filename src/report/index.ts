@@ -1,4 +1,4 @@
-import {_global, _support, isNumber, isString} from '../utils';
+import {_global, _support, isNumber, isString, zip} from '../utils';
 import {Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum} from '../types'
 import logger from '../logger'
 
@@ -10,18 +10,16 @@ class ReportLogs {
   /**
    * 系统上报
    * @param {ReportDataFace} data 需要上报的内容
-   * @param {boolean} isBeacon 是否使用 sendBeacon 的上报方式
+   * @param {boolean} isSong 是否立即上报
    * */
-  sendSystem(data: ReportSystemDataFace, isBeacon = false) {
-    if (data.type === ReportTypeEnum.PERFORMANCE || isBeacon) {
-      this.reportSendBeacon(data);
+  sendSystem(data: ReportSystemDataFace, isSong = false) {    
+    if (data.type === ReportTypeEnum.PERFORMANCE || data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
+      this.requestIdleCallback(this.reportSendBeacon, data, isSong);
+    } else if (data.type === ReportTypeEnum.CLICK || data.type === ReportTypeEnum.ACTION_RECORD) {
+      this.requestIdleCallback(this.reportSendZip, data, isSong);
     } else {
-      if (data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
-        this.requestIdleCallback(() => this.reportSendBeacon(data));
-      } else {
-        this.requestIdleCallback(() => this.reportSendFetch(data));
-      }
-    }
+      this.requestIdleCallback(this.reportSendFetch, data, isSong);
+    }      
   }
 
   // 自定义日志上报
@@ -31,18 +29,18 @@ class ReportLogs {
       return;
     }
 
-    this.requestIdleCallback(() => this.reportSendFetch({
+    this.requestIdleCallback(this.reportSendFetch, {
       type: ReportTypeEnum.CUSTOM,
       data,
-    }));
+    });
   }
 
   // 利用空闲时间上报
-  private requestIdleCallback(reportFn: Callback) {
-    if ('requestIdleCallback' in _global) {
-      requestIdleCallback(reportFn);
+  private requestIdleCallback(reportFn: Callback, params: ReportSystemDataFace, isSong = false) {
+    if (!isSong && 'requestIdleCallback' in _global) {
+      requestIdleCallback(reportFn.bind(this, params));
     } else {
-      reportFn();
+      reportFn.bind(this, params);
     }
   }
 
@@ -53,7 +51,7 @@ class ReportLogs {
       appId: _support.options.appid,
       visitorId: _support.visitorId,
       uuid: _support.uuid,
-      data: this.getParamsString(data.data),
+      data: isString(data.data) ? data.data : this.getParamsString(data.data),
       params: this.getParamsString(_support.params),
       device: this.getParamsString({ ..._support.devices, sdkVersion: _support.version }),
       path: _global.location.href,
@@ -78,13 +76,13 @@ class ReportLogs {
           },
           body: JSON.stringify({ data: this.sendReportParams(data) }),
         }).catch(err => {
-          logger.error('---fetch 上报失败---', err);
+          logger.warn('---fetch 上报失败---', err);
         })
       } else {
         this.reportSendXhr(data);
       }
     } catch (err) {
-      logger.error('---fetch 上报失败---', err);
+      logger.warn('---fetch 上报失败---', err);
     }
   }
 
@@ -96,7 +94,7 @@ class ReportLogs {
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.send(JSON.stringify({ data: this.sendReportParams(data) }));
     } catch (err) {
-      logger.error('---xhr 上报失败---', err);
+      logger.warn('---xhr 上报失败---', err);
     }
   }
 
@@ -110,7 +108,7 @@ class ReportLogs {
       const image = new Image();
       image.src = `${_support.options.dsn}/image?data=${this.sendReportParams(data)}}`;
     } catch (err) {
-      console.error('---image 上报失败---', err);
+      logger.warn('---image 上报失败---', err);
     }
   }
 
@@ -130,19 +128,31 @@ class ReportLogs {
         this.reportSendFetch(data);
       }
     } catch (err) {
-      logger.error('---beacon 上报失败---', err);
+      logger.warn('---beacon 上报失败---', err);
     }
   }
 
   // 压缩数据上报
-  private reportSendZip() {
-
+  private reportSendZip(data: ReportSystemDataFace) {
+    if (_global.hasOwnProperty('fetch')) {
+      const withData = this.sendReportParams(data);
+      const compressedData = zip({data: withData});
+      fetch(`${_support.options.dsn}/pako`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        body: compressedData,
+      }).catch((err) => {
+        logger.warn('pako err: ', err);
+      })
+    }
   }
 }
 
 const instance = new ReportLogs();
-const reportLogs = (data: ReportSystemDataFace, sendBeacon?: boolean) => {
-  instance.sendSystem(data, sendBeacon);
+const reportLogs = (data: ReportSystemDataFace, isSong?: boolean) => {
+  instance.sendSystem(data, isSong);
 }
 reportLogs.sendCustom = instance.sendCustom.bind(instance);
 export default reportLogs;

@@ -1,6 +1,7 @@
 import {record, EventType} from "rrweb";
 import {_support, isNumber} from "../utils";
 import {LOG_LEVEL_ENUM, ReportTypeEnum} from "../types";
+import reportLogs from "../report";
 
 export default class ActionRecord {
     private curRecord: ReturnType<typeof record>;
@@ -74,7 +75,11 @@ export default class ActionRecord {
     reportRecordData(isSong = false){
         clearTimeout(_support._record_delay_timer);
         _support._record_delay_timer = null;
-        window.localStorage.setItem("test-record", JSON.stringify([this.metaSnapshot, this.fullSnapshot, ...this.list]));
+
+        reportLogs({
+            type: ReportTypeEnum.ACTION_RECORD,
+            data: JSON.stringify([this.metaSnapshot, this.fullSnapshot, ...this.list]),
+        }, isSong)
         this.list = [];
     }
 }

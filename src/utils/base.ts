@@ -4,6 +4,9 @@ import { _global, isString } from '../utils';
 import { Callback, ErrorTypeEnum, StackFrameFace } from '../types';
 import logger from '../logger';
 
+export const docScreenW = () => _global.document.documentElement?.clientWidth || _global.document.body.clientWidth;
+export const docScreenH = () => _global.document.documentElement?.clientHeight || _global.document.body.clientHeight;
+
 // 获取当前时间
 export const getTimestamp = (): number => {
   return new Date().getTime()
@@ -191,12 +194,29 @@ export function throttle<T extends (...args: any[]) => void>(func: T, limit: num
 }
 
 /**
+ * 防抖
+ * */
+export function debounce<T extends (...args: any[]) => void>(func: T, limit: number): T {
+  let lastFunc: ReturnType<typeof setTimeout>;
+
+  return function (this: any, ...args: Parameters<T>) {
+    if (lastFunc) {
+      clearTimeout(lastFunc);
+    }
+
+    lastFunc = setTimeout(() => {
+      func(...args);
+    }, limit);
+  } as T;
+}
+
+/**
  * 压缩数据
  * */
 export function zip(data: any) {
   if (!data) return data;
   try {
-    const dataJsonStr = JSON.stringify(data);
+    const dataJsonStr = isString(data) ? data : JSON.stringify(data);
     return pako.gzip(dataJsonStr);
   } catch (err) {
     logger.error(err);

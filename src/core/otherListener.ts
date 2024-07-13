@@ -1,6 +1,6 @@
-import { _global, _support, getTimestamp, on, throttle, zip } from '../utils';
+import { _global, _support, getTimestamp, on, throttle, debounce, docScreenW, docScreenH } from '../utils';
 import {ReportTypeEnum} from "../types";
-import report from '../report'
+import reportLogs from '../report'
 
 interface ClickFace {
     id: string | null;
@@ -20,29 +20,33 @@ export default class OtherListener {
         this.beforeUnLoad();
         this.clickEvent();
         this.touchEvent();
+        this.resizeEvent();
     }
 
     listener() {
         // 代码报错后，6s 后上报行为数据
         _support.events.on(ReportTypeEnum.CODE, () => {
             _support._click_delay_timer = setTimeout(() => {
-                console.info("===zip===", this.clicks);
-                report({
-                    type: ReportTypeEnum.CLICK,
-                    data: zip(this.clicks),
-                });
-                this.clicks = [];
+                this.reportClickData();
             }, 5000);
         })
 
         // 页面被关闭，则立即上报
         _support.events.on("report_click_song", () => {
-            report({
-                type: ReportTypeEnum.CLICK,
-                data: this.clicks,
-            }, true)
-            this.clicks = [];
+            this.reportClickData(true);
         })
+    }
+
+    reportClickData(isSong = false) {
+        clearTimeout(_support._click_delay_timer);
+        _support._click_delay_timer = null;
+
+        reportLogs({
+            type: ReportTypeEnum.CLICK,
+            data: JSON.stringify(this.clicks),
+        }, isSong);
+
+        this.clicks = [];
     }
 
     // 浏览器关闭/刷新前触发的回调
@@ -70,7 +74,7 @@ export default class OtherListener {
         on(_global.document, "touchstart", this.handleClick, true);
     }
 
-    // 防止快速点击，添加防抖
+    // 防止快速点击，添加节流
     handleClick = throttle((event: MouseEvent) => {
         const target = (event.target as HTMLElement);
         if (target) {
@@ -90,4 +94,12 @@ export default class OtherListener {
         }
     }, 500)
 
+    // 浏览器窗口变化监听
+    resizeEvent() {
+        on(_global, 'resize', this.handleResize);
+    }
+    // 尺寸变化，添加防抖
+    handleResize = debounce(() => {
+        _support.devices.docScreen = `${docScreenW()}x${docScreenH()}`;
+    }, 2000);
 }
