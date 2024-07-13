@@ -49,6 +49,7 @@ export enum ReportTypeEnum {
     RESOURCES = "resources", // 资源异常
     WHITE_SCREEN = "whiteScreen", // 白屏检测
     ACTION_RECORD = "action_record", // 录屏
+    CONSOLE = "console", // console
     OTHER = "other", // 其他，预留类型
     CUSTOM = "custom", // 自定义
 }
