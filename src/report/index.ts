@@ -14,11 +14,11 @@ class ReportLogs {
    * */
   sendSystem(data: ReportSystemDataFace, isSong = false) {    
     if (data.type === ReportTypeEnum.PERFORMANCE || data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
-      this.requestIdleCallback(this.reportSendBeacon, data, isSong);
+      this.requestIdleCallback(()=> this.reportSendBeacon(data), isSong);
     } else if (data.type === ReportTypeEnum.CLICK || data.type === ReportTypeEnum.ACTION_RECORD) {
-      this.requestIdleCallback(this.reportSendZip, data, isSong);
+      this.requestIdleCallback(() => this.reportSendZip(data), isSong);
     } else {
-      this.requestIdleCallback(this.reportSendFetch, data, isSong);
+      this.requestIdleCallback(() => this.reportSendFetch(data), isSong);
     }      
   }
 
@@ -29,18 +29,18 @@ class ReportLogs {
       return;
     }
 
-    this.requestIdleCallback(this.reportSendFetch, {
+    this.requestIdleCallback(() => this.reportSendFetch({
       type: ReportTypeEnum.CUSTOM,
       data,
-    });
+    }));
   }
 
   // 利用空闲时间上报
-  private requestIdleCallback(reportFn: Callback, params: ReportSystemDataFace, isSong = false) {
+  private requestIdleCallback(reportFn: Callback, isSong = false) {
     if (!isSong && 'requestIdleCallback' in _global) {
-      requestIdleCallback(reportFn.bind(this, params));
+      requestIdleCallback(() => reportFn());
     } else {
-      reportFn.bind(this, params);
+      reportFn();
     }
   }
 
@@ -121,6 +121,23 @@ class ReportLogs {
     try {
       if (!!navigator?.sendBeacon && !_global?.isBlockBeacon) {
         const beaconSent = navigator.sendBeacon(`${_support.options.dsn}/beacon`, JSON.stringify({data: this.sendReportParams(data)}));
+        if (!beaconSent) {
+          this.reportSendFetch(data);
+        }
+      } else {
+        this.reportSendFetch(data);
+      }
+    } catch (err) {
+      logger.warn('---beacon 上报失败---', err);
+    }
+  }
+
+  private reportSendBeaconBuffer(data: ReportSystemDataFace) {
+    try {
+      if (!!navigator?.sendBeacon && !_global?.isBlockBeacon) {
+        const compressedData = zip({data: this.sendReportParams(data)});
+        const blob = new Blob([compressedData], { type: 'application/octet-stream' });
+        const beaconSent = navigator.sendBeacon(`${_support.options.dsn}/beacon-buffer`, blob);
         if (!beaconSent) {
           this.reportSendFetch(data);
         }

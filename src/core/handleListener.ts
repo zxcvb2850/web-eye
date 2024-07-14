@@ -1,8 +1,10 @@
 import {_global, _support, getErrorType, getMd5, on, parseStackError} from "../utils";
 import {ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown} from "../types";
-import report from '../report'
+import reportLogs from "../report";
 
 export default class HandleListener {
+    private cacheSet = new Set<string>();
+
     constructor() {
         this.windowError();
         this.rejectError();
@@ -37,13 +39,18 @@ export default class HandleListener {
             }
             const id = getMd5(`${errorContent.msg}`);
 
-            report({
-                type: ReportTypeEnum.PROMISE,
-                data: {
-                    id, ...errorContent,
-                    status: event?.reason.name || UnKnown,
-                },
-            });
+            // 避免重复上报
+            if (!this.cacheSet.has(id)) {
+                this.cacheSet.add(id);
+
+                reportLogs({
+                    type: ReportTypeEnum.PROMISE,
+                    data: {
+                        id, ...errorContent,
+                        status: event?.reason.name || UnKnown,
+                    },
+                });
+            }
         });
     }
 
@@ -54,10 +61,14 @@ export default class HandleListener {
         const localName = (cTarget as HTMLElement).localName;
         const id = getMd5(`${url}${localName}`);
 
-        report({
-            type: ReportTypeEnum.RESOURCES,
-            data: {type, id, url, localName},
-        });
+        // 避免重复上报
+        if (!this.cacheSet.has(id)) {
+            this.cacheSet.add(id);
+            reportLogs({
+                type: ReportTypeEnum.RESOURCES,
+                data: {type, id, url, localName},
+            });
+        }
     }
 
     // 代码执行错误
@@ -66,16 +77,21 @@ export default class HandleListener {
         const {message, filename, lineno, colno} = event;
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
 
-        // 发送事件
-        _support.events.emit(ReportTypeEnum.CODE);
+        // 避免重复上报
+        if (!this.cacheSet.has(id)) {
+            this.cacheSet.add(id);
 
-        report({
-            type: ReportTypeEnum.CODE,
-            data: {
-                id, msg: message, frames: stacks,
-                status: event?.error?.name || UnKnown,
-            },
-        });
+            // 发送事件
+            _support.events.emit(ReportTypeEnum.CODE);
+
+            reportLogs({
+                type: ReportTypeEnum.CODE,
+                data: {
+                    id, msg: message, frames: JSON.stringify(stacks),
+                    status: event?.error?.name || UnKnown,
+                },
+            });
+        }
     }
 
     // 处理 react 开发环境会执行两次
