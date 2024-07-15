@@ -35,6 +35,16 @@ export enum PerformanceEnum {
 export const UnKnown = "UnKnown";
 
 /**
+ * 上报网络方式
+ */
+export enum ReportNetEnum {
+    FETCH = "fetch",
+    IMAGE = "image",
+    XHR = "xhr",
+    BEACON = "beacon",
+}
+
+/**
  * 上报类型
  * */
 export enum ReportTypeEnum {
@@ -114,13 +124,13 @@ export interface ReportSystemDataFace {
     type: ReportTypeEnum;
 
     data: IAnyObject | string;
+
+    errorId?: string;
+
+    event?: string | number;
 }
 
 /**
  * 自定义上报字段
  * */
-export interface ReportCustomDataFace {
-    event: string | number;
-
-    [key: string]: any;
-}
+export type ReportCustomDataFace = IAnyObject | string;

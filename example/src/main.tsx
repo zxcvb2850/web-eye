@@ -5,10 +5,9 @@ import App from './App.tsx'
 import KingWebEye from '../../src';
 import './index.css'
 
-console.info('---KingWebEye---', KingWebEye);
 KingWebEye.init({
     dsn: "http://127.0.0.1:4567/api/report-logs",
-    appid: "6690936fa7816a4cca157261",
+    appid: "6695034c40c7768292753691",
     isPlayback: false,
     whiteScreenDoms: ["html", "body", "#root"],
     isActionRecord: true, // 是否开启屏幕动作录制

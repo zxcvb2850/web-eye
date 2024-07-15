@@ -22,7 +22,6 @@
     "@rollup/plugin-wasm": "^6.2.2",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20.14.7",
-    "@types/ua-parser-js": "^0.7.39",
     "rollup": "^4.18.0",
     "rollup-plugin-livereload": "^2.0.5",
     "tslib": "^2.6.3",
@@ -33,7 +32,6 @@
     "crypto-js": "^4.2.0",
     "pako": "^2.1.0",
     "rrweb": "2.0.0-alpha.4",
-    "ua-parser-js": "^1.0.38",
     "web-vitals": "^4.2.0"
   },
   "type": "module"

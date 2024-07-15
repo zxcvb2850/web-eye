@@ -19,7 +19,7 @@ import HandleListener from "./core/handleListener";
 import WhiteScreen from "./core/whiteScreen";
 import ActionRecord from "./core/actionRecord";
 import OtherListener from "./core/otherListener";
-import report from './report'
+import reportLogs from './report'
 
 /**
  * 入口文件
@@ -162,8 +162,8 @@ class KingWebEye {
         _support.params[key] = value;
     }
 
-    sendCustom (data: ReportCustomDataFace) {
-        report.sendCustom(data);
+    sendCustom (event: string | number, data: ReportCustomDataFace) {
+        reportLogs.sendCustom(event, data);
     }
 }
 

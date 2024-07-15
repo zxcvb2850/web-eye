@@ -8,6 +8,7 @@ export default class ActionRecord {
     private list: any[] = [];
     private metaSnapshot: any = null;
     private fullSnapshot: any = null;
+    private errorId: string = ''; // 代码错误ID
 
     constructor() {
         this.startRecord();
@@ -18,7 +19,8 @@ export default class ActionRecord {
     // 监听回调的方式上传行为日志
     listener() {
         // 代码报错后，6s 后上报行为数据
-        _support.events.on(ReportTypeEnum.CODE, () => {
+        _support.events.on(ReportTypeEnum.CODE, (errorId: string) => {
+            this.errorId = errorId;
             _support._record_delay_timer = setTimeout(() => {
                 this.reportRecordData();
             }, 5000);
@@ -78,8 +80,10 @@ export default class ActionRecord {
 
         reportLogs({
             type: ReportTypeEnum.ACTION_RECORD,
-            data: JSON.stringify([this.metaSnapshot, this.fullSnapshot, ...this.list]),
+            data: [this.metaSnapshot, this.fullSnapshot, ...this.list],
+            errorId: this.errorId,
         }, isSong)
         this.list = [];
+        this.errorId = '';
     }
 }

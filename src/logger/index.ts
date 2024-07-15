@@ -7,7 +7,8 @@ import {
     typeOf,
     WebIndexedDB
 } from "../utils";
-import {LOG_LEVEL_ENUM} from "../types";
+import {LOG_LEVEL_ENUM, ReportTypeEnum} from "../types";
+import reportLogs from '../report';
 
 class Logger {
     private db: WebIndexedDB | null = null;
@@ -37,7 +38,7 @@ class Logger {
         if (this.isCurrentLevel(level)) {
             const logMethods = this.logMethods[level];
             if (isSystem) {
-                this.recordLogs(level, args);
+                this.withConsoleData(level, args);
             }
             logMethods(`${isSystem ? "": `【${_support.name}】 `}`, ...args);
         }
@@ -79,7 +80,7 @@ class Logger {
         }
     }
 
-    async recordLogs(level: LOG_LEVEL_ENUM, args: any[]) {
+    async withConsoleData(level: LOG_LEVEL_ENUM, args: any[]) {
         const logMethods = this.logMethods[level];
         const content = args.map(arg => {
             try {
@@ -124,14 +125,16 @@ class Logger {
                     time: getTimestamp(),
                     path: `${origin}${pathname}${hash}`,
                     query: parseUrlEncodedBody(search),
-                    uuid: _support.params.uuid,
+                    uuid: _support.uuid,
+                    params: _support.params,
+                    device: _support.devices,
                     content,
                 };
-                // 缓存 60s 日志，防止重复上报
+                // 缓存 30s 日志，防止重复上报
                 const md5 = getMd5(`${data.level}${data.content}${data.path}${data.query}`);
                 if (this.logMap.has(md5)) {
                     const oldTime = this.logMap.get(md5) || 0;
-                    if(getTimestamp() - oldTime < 60 * 1000) return;
+                    if(getTimestamp() - oldTime < 30 * 1000) return;
                 }
                 this.logMap.set(md5, getTimestamp());
                 const count = await this.db.addData(data);
@@ -139,13 +142,21 @@ class Logger {
                     this.isReport = true;
                     const result = await this.db.getAllData();
                     this.isReport = false;
-                    console.info("===上报 console 信息===", result);
+                    this.reportConsoleData(result);
                     await this.db.clearData();
                 }
             } catch (err) {
                 this.warn(`save console indexDB err: `, err);
             }
         }
+    }
+
+    reportConsoleData(data: any){
+        console.info("===上报 console 信息===", data);
+        // reportLogs({
+        //     type: ReportTypeEnum.CONSOLE,
+        //     data
+        // })
     }
 }
 

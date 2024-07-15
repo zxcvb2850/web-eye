@@ -1,9 +1,9 @@
-import {_global, _support, getErrorType, getMd5, on, parseStackError} from "../utils";
-import {ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown} from "../types";
+import { _global, _support, getErrorType, getMd5, on, parseStackError, getTimestamp, getUuid } from "../utils";
+import { ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown } from "../types";
 import reportLogs from "../report";
 
 export default class HandleListener {
-    private cacheSet = new Set<string>();
+    private cacheMap = new Map<string, number>();
 
     constructor() {
         this.windowError();
@@ -39,18 +39,10 @@ export default class HandleListener {
             }
             const id = getMd5(`${errorContent.msg}`);
 
-            // 避免重复上报
-            if (!this.cacheSet.has(id)) {
-                this.cacheSet.add(id);
-
-                reportLogs({
-                    type: ReportTypeEnum.PROMISE,
-                    data: {
-                        id, ...errorContent,
-                        status: event?.reason.name || UnKnown,
-                    },
-                });
-            }
+            this.reportRecordData(id, ReportTypeEnum.PROMISE, {
+                ...errorContent,
+                status: event?.reason.name || UnKnown,
+            })
         });
     }
 
@@ -61,14 +53,7 @@ export default class HandleListener {
         const localName = (cTarget as HTMLElement).localName;
         const id = getMd5(`${url}${localName}`);
 
-        // 避免重复上报
-        if (!this.cacheSet.has(id)) {
-            this.cacheSet.add(id);
-            reportLogs({
-                type: ReportTypeEnum.RESOURCES,
-                data: {type, id, url, localName},
-            });
-        }
+        this.reportRecordData(id, ReportTypeEnum.RESOURCES, {id, type, url, localName})
     }
 
     // 代码执行错误
@@ -77,21 +62,35 @@ export default class HandleListener {
         const {message, filename, lineno, colno} = event;
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
 
-        // 避免重复上报
-        if (!this.cacheSet.has(id)) {
-            this.cacheSet.add(id);
+        const errorId = getUuid();
+        const isReport = this.reportRecordData(id, ReportTypeEnum.CODE, {
+            msg: message, frames: JSON.stringify(stacks),
+            status: event?.error?.name || UnKnown,
+            errorId,
+        })
 
+        if (isReport) {
             // 发送事件
-            _support.events.emit(ReportTypeEnum.CODE);
-
-            reportLogs({
-                type: ReportTypeEnum.CODE,
-                data: {
-                    id, msg: message, frames: JSON.stringify(stacks),
-                    status: event?.error?.name || UnKnown,
-                },
-            });
+            _support.events.emit(ReportTypeEnum.CODE, errorId);
         }
+    }
+
+    // 上报错误
+    private reportRecordData(id: string, type: ReportTypeEnum, data: any): boolean {
+        const oldTime = this.cacheMap.get(id);
+        const now = getTimestamp();
+        let isReport = false;
+        // 60s 内只上报一次
+        if (!oldTime || now - oldTime > 60 * 1000) {
+            isReport = true;
+            this.cacheMap.set(id, now);
+        }
+
+        if (isReport) {
+            reportLogs({type, data});
+        }
+
+        return isReport;
     }
 
     // 处理 react 开发环境会执行两次

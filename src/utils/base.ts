@@ -211,12 +211,38 @@ export function debounce<T extends (...args: any[]) => void>(func: T, limit: num
 }
 
 /**
+ * JSON转字符串
+ */
+export function jsonToString(data: any) {
+  if (!data) return data;
+  try {
+    return JSON.stringify(data);
+  } catch (err) {
+    logger.error(err);
+    return data;
+  }
+}
+
+/**
+ * 字符串转JSON
+ */
+export function stringToJSON(data: any) {
+  if (!data) return data;
+  try {
+    return JSON.parse(data);
+  } catch (err) {
+    logger.error(err);
+    return data;
+  }
+}
+
+/**
  * 压缩数据
  * */
 export function zip(data: any) {
   if (!data) return data;
   try {
-    const dataJsonStr = isString(data) ? data : JSON.stringify(data);
+    const dataJsonStr = isString(data) ? data : jsonToString(data);
     return pako.gzip(dataJsonStr);
   } catch (err) {
     logger.error(err);

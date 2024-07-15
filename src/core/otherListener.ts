@@ -14,6 +14,7 @@ interface ClickFace {
 
 export default class OtherListener {
     private clicks: ClickFace[] = [];
+    private errorId: string = '';
 
     constructor() {
         this.listener();
@@ -25,7 +26,8 @@ export default class OtherListener {
 
     listener() {
         // 代码报错后，6s 后上报行为数据
-        _support.events.on(ReportTypeEnum.CODE, () => {
+        _support.events.on(ReportTypeEnum.CODE, (errorId: string) => {
+            this.errorId = errorId;
             _support._click_delay_timer = setTimeout(() => {
                 this.reportClickData();
             }, 5000);
@@ -43,7 +45,8 @@ export default class OtherListener {
 
         reportLogs({
             type: ReportTypeEnum.CLICK,
-            data: JSON.stringify(this.clicks),
+            data: this.clicks,
+            errorId: this.errorId,
         }, isSong);
 
         this.clicks = [];
