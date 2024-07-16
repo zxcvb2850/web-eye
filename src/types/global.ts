@@ -47,7 +47,7 @@ export interface OptionsFace {
     maxClickLimit?: number; // 记录点击数量
     filterHttpUrlWhite?: (string | RegExp)[]; // 过滤需要上报的白名单
     filterHttpHeadersWhite?: (string | RegExp)[]; // 由于隐私问题，过滤请求接口中的Header白名单
-    transformResponse: null | Function; // 自定义请求响应上报数据
+    transformResponse: null | ((res: string) => boolean); // 自定义请求响应上报数据
 }
 
 // 自定义参数

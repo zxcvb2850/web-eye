@@ -197,7 +197,21 @@ export default class HttpProxy {
                     if (this.readyState === 4) {
                         if (this.status >= 200 && this.status < 300) {
                             if (_support.options.transformResponse) {
-                                _support.options.transformResponse(this.responseText);
+                                const isReport = _support.options.transformResponse(this.responseText);
+                                if (!!isReport) {
+                                    reportLogs({
+                                        type: ReportTypeEnum.XHR,
+                                        data: {
+                                            network: NetworkErrorEnum.SUCCESS,
+                                            status: this.status,
+                                            url: `${domain.origin}${domain.pathname}`,
+                                            method,
+                                            headers,
+                                            params,
+                                            time,
+                                        }
+                                    })
+                                }
                             } else {
                                 const data = stringToJSON(this.responseText);
                                 if (data?.code !== 200) {
