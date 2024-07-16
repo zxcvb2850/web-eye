@@ -9,7 +9,7 @@ import {
     setCacheData,
     validateOptions
 } from "./utils";
-import { LOG_LEVEL_ENUM, OptionsFace, ParamsFace, ReportCustomDataFace } from './types';
+import { LOG_LEVEL_ENUM, OptionsFace, ParamsFace, ReportCustomDataFace, ReactErrorBoundary } from './types';
 import logger from "./logger";
 import FingerprintJS from "@fingerprintjs/fingerprintjs";
 import WebVitals from "./core/webVitals";
@@ -33,12 +33,14 @@ class KingWebEye {
         this.options = {
             dsn: "",
             appid: "",
-            level: LOG_LEVEL_ENUM.DEBUG,
+            logLevel: LOG_LEVEL_ENUM.DEBUG,
             isConsole: true,
-            maxRecordLimit: 100,
+            maxRecordLimit: 30,
             isRecordClick: true,
             maxClickLimit: 20,
-            filterHttpUrl: [],
+            filterHttpUrlWhite: [new RegExp('chunk.js.map$'), new RegExp('.chunk.js$'), new RegExp('.hot-update.json$')],
+            filterHttpHeadersWhite: [],
+            transformResponse: null,
         };
 
         _support.options = this.options;
@@ -94,9 +96,9 @@ class KingWebEye {
             logger.setLevel(LOG_LEVEL_ENUM.DEBUG);
             this.options.debug = options.debug;
         }
-        if (validateOptions(options.level, "level", "number", true)) {
-            this.options.level = options.level;
-            !this.options.debug && logger.setLevel(options.level as number);
+        if (validateOptions(options.logLevel, "level", "number", true)) {
+            this.options.logLevel = options.logLevel;
+            !this.options.debug && logger.setLevel(options.logLevel as number);
         }
         validateOptions(options.isConsole, "isConsole", "boolean", true) && (this.options.isConsole = options.isConsole);
         if (validateOptions(options.whiteScreenDoms, "whiteScreenDoms", "array", true)) {
@@ -113,14 +115,15 @@ class KingWebEye {
                 this.actionRecord = new ActionRecord();
             }
         }
-        validateOptions(options.maxRecordLimit, "maxRecordLimit", "number", true) && (this.options.maxRecordLimit = options.maxRecordLimit)
-        validateOptions(options.isRecordClick, "isRecordClick", "boolean", true) && (this.options.isRecordClick = options.isRecordClick)
-        validateOptions(options.maxClickLimit, "maxClickLimit", "number", true) && (this.options.maxClickLimit = options.maxClickLimit)
+        validateOptions(options.maxRecordLimit, "maxRecordLimit", "number", true) && (this.options.maxRecordLimit = options.maxRecordLimit);
+        validateOptions(options.isRecordClick, "isRecordClick", "boolean", true) && (this.options.isRecordClick = options.isRecordClick);
+        validateOptions(options.maxClickLimit, "maxClickLimit", "number", true) && (this.options.maxClickLimit = options.maxClickLimit);
+        validateOptions(options.filterHttpUrlWhite, "filterHttpUrlWhite", "array", true) && (this.options.filterHttpUrlWhite = [...this.options.filterHttpUrlWhite!, ...options.filterHttpUrlWhite!]);
+        validateOptions(options.filterHttpHeadersWhite, "filterHttpHeadersWhite", "array", true) && (this.options.filterHttpHeadersWhite = options.filterHttpHeadersWhite);
+        validateOptions(options.transformResponse, "transformResponse", "function", true) && (this.options.transformResponse = options.transformResponse);
 
         // 日志初始化
         logger.init();
-
-        logger.log("----------------init----------------");
 
         // 请求监听
         new HttpProxy();
@@ -136,18 +139,22 @@ class KingWebEye {
         }
         if (this.options.hasOwnProperty(key)) {
             if (key === "debug" && validateOptions(value, key, "boolean", false)) {
-                if (value === false && this.options.level != null) {
-                    logger.setLevel(this.options.level);
+                if (value === false && this.options.logLevel != null) {
+                    logger.setLevel(this.options.logLevel);
                 } else if (value === true) {
                     logger.setLevel(LOG_LEVEL_ENUM.DEBUG);
                 }
             }
-            if (!this.options.debug && key === "level" && validateOptions(value, key, "number", false)) {
+            if (!this.options.debug && key === "logLevel" && validateOptions(value, key, "number", false)) {
                 logger.setLevel(value as number);
             }
 
             if (key === "isActionRecord" && value === false && this.actionRecord?.stopRecord) {
                 this.actionRecord.stopRecord();
+            }
+
+            if (key === 'filterHttpUrlWhite') {
+                this.options.filterHttpUrlWhite = [...this.options.filterHttpUrlWhite!, ...(value as (string | RegExp)[])];
             }
 
             (this.options[key] as OptionsFace[keyof OptionsFace]) = value;
@@ -164,6 +171,22 @@ class KingWebEye {
 
     sendCustom (event: string | number, data: ReportCustomDataFace) {
         reportLogs.sendCustom(event, data);
+    }
+    
+    // 自定义执行行为上报 - 点击事件，屏幕录制，方便线上调试
+    sendCustomRecord(id: string) {
+        if(!id) id = getUuid();
+        _support.events.emit('SEDN_REPORT_CLICK_RECORD', id);
+    }
+
+    /**
+     * 发送 React 错误边界信息
+     *
+     * @param error 错误对象
+     */
+    sendReactErrorBoundary(error: Error, errorInfo: ReactErrorBoundary) {
+        _global.isErrorHandledByBoundary = true;
+        _support.events.emit('REACT_ERROR_BOUNDARY', error, errorInfo);
     }
 }
 

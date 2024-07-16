@@ -1,6 +1,6 @@
 import md5 from 'crypto-js/md5';
 import * as pako from 'pako';
-import { _global, isString } from '../utils';
+import { _global, isString, isRegExp } from '../utils';
 import { Callback, ErrorTypeEnum, StackFrameFace } from '../types';
 import logger from '../logger';
 
@@ -248,4 +248,26 @@ export function zip(data: any) {
     logger.error(err);
     return data;
   }
+}
+
+/**
+ * 过滤白名单函数
+ *
+ * @param filterList 过滤列表，包含字符串或正则表达式
+ * @param str 待过滤的字符串
+ * @returns 如果字符串包含过滤列表中的任一元素（字符串或正则表达式匹配），则返回true；否则返回false
+ */
+export function filterWhiteList(filterList: (string | RegExp)[], str: string) {
+  // filterHttpUrl 中可能会有正则, 字符串
+  for (let i = 0; i < filterList.length; i++) {
+    const filter = filterList[i];
+    if (isString(filter)) {
+        // 字符串
+        if (str.indexOf(filter) !== -1) return true;
+    } else if (isRegExp(filter)) {
+        // 正则
+        if (filter.test(str)) return true;
+    }
+  }
+  return false;
 }

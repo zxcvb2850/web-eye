@@ -56,6 +56,7 @@ export enum ReportTypeEnum {
     HASHCHANGE = "hashchange", // hash 变化
     PROMISE = "promise", // promise
     CODE = "code", // 代码错误
+    REACT = "react", // react 错误边界错误
     RESOURCES = "resources", // 资源异常
     WHITE_SCREEN = "whiteScreen", // 白屏检测
     ACTION_RECORD = "action_record", // 录屏

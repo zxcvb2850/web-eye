@@ -1,5 +1,5 @@
 {
-  "name": "king-web-eye",
+  "name": "web-eye-sdk",
   "version": "0.0.1",
   "description": "",
   "main": "dist/build.cjs.js",

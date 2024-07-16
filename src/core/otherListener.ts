@@ -33,6 +33,12 @@ export default class OtherListener {
             }, 5000);
         })
 
+        // 自定义触发上报行为数据
+        _support.events.on('SEDN_REPORT_CLICK_RECORD', (id: string) => {
+            this.errorId = id;
+            this.reportClickData(true);
+        })
+
         // 页面被关闭，则立即上报
         _support.events.on("report_click_song", () => {
             this.reportClickData(true);

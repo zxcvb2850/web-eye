@@ -15,6 +15,7 @@ export interface Window {
     localStorage: Storage;
     innerWidth: number;
     innerHeight: number;
+    isErrorHandledByBoundary: boolean; // 标记 React 收到错误
 }
 
 export interface KingWebEye {
@@ -36,7 +37,7 @@ export interface OptionsFace {
     dsn: string;
     appid: string;
     isConsole?: boolean;
-    level?: number;
+    logLevel?: number;
     isPlayback?: boolean;
     debug?: boolean;
     whiteScreenDoms?: string[]; // 白屏检测需要查询的DOM节点
@@ -44,10 +45,16 @@ export interface OptionsFace {
     maxRecordLimit?: number; // 记录行为数量
     isRecordClick?: boolean; // 是否记录点击事件
     maxClickLimit?: number; // 记录点击数量
-    filterHttpUrl?: string[]; // 过滤需要上报的白名单
+    filterHttpUrlWhite?: (string | RegExp)[]; // 过滤需要上报的白名单
+    filterHttpHeadersWhite?: (string | RegExp)[]; // 由于隐私问题，过滤请求接口中的Header白名单
+    transformResponse: null | Function; // 自定义请求响应上报数据
 }
 
 // 自定义参数
 export interface ParamsFace {
     [key: string]: any; // 自定义额外字段
+}
+
+export interface ReactErrorBoundary {
+    componentStack: string;
 }

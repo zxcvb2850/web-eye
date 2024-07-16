@@ -5,13 +5,14 @@ import {
     getQueryParams,
     getTimestamp, on, parseStackError,
     parseUrlEncodedBody,
-    replaceOriginal
+    replaceOriginal,
+    filterWhiteList,
+    isFunction,
+    stringToJSON,
 } from '../utils';
 import {IAnyObject, NetworkErrorEnum, ReportTypeEnum} from "../types";
-import report from '../report'
-
-// 由于隐私问题，需要过了部分字段
-const headersWhite = ["Accept", "Authorization", "Appsubcode", "Appcode"]; // 过滤白名单
+import logger from '../logger';
+import reportLogs from '../report';
 
 export default class HttpProxy {
     constructor() {
@@ -48,16 +49,20 @@ export default class HttpProxy {
                 if (headers instanceof Headers) {
                     headers.forEach((value, key) => {
                         const hKey = formatHeadersKey(key);
-                        if (headersWhite.indexOf(hKey) !== -1) {
-                            headersObj[hKey] = value;
+                        if (_support.options.filterHttpHeadersWhite?.length) {
+                            !filterWhiteList(_support.options.filterHttpHeadersWhite, key) && (headersObj[hKey] = value);
+                        } else {
+                            headersObj[hKey] = value
                         }
                     });
                 } else if (headers) {
                     for (const key in headers) {
                         if (headers.hasOwnProperty(key)) {
                             const hKey = formatHeadersKey(key);
-                            if (headersWhite.indexOf(hKey) !== -1) {
-                                headersObj[hKey] = headers[key];
+                            if (_support.options.filterHttpHeadersWhite?.length) {
+                                !filterWhiteList(_support.options.filterHttpHeadersWhite, key) && (headersObj[hKey] = headers[key]);
+                            } else {
+                                headersObj[hKey] = headers[key]
                             }
                         }
                     }
@@ -90,10 +95,10 @@ export default class HttpProxy {
                             const endTime = getTimestamp();
                             const time = endTime - startTime;
 
-                            report({
+                            reportLogs({
                                 type: ReportTypeEnum.FETCH,
                                 data: {
-                                    status: NetworkErrorEnum.SUCCESS,
+                                    network: NetworkErrorEnum.SUCCESS,
                                     url: `${domain.origin}${domain.pathname}`,
                                     method,
                                     headers: headersObj,
@@ -108,10 +113,10 @@ export default class HttpProxy {
 
                         const endTime = getTimestamp();
                         const time = endTime - startTime;
-                        report({
+                        reportLogs({
                             type: ReportTypeEnum.FETCH,
                             data: {
-                                status: NetworkErrorEnum.SUCCESS,
+                                network: NetworkErrorEnum.SUCCESS,
                                 url: `${domain.origin}${domain.pathname}`,
                                 method,
                                 headers: headersObj,
@@ -150,8 +155,11 @@ export default class HttpProxy {
                     // @ts-ignore
                     this.king_web_eye_xhr.headers = {};
                 }
-                const hKey = formatHeadersKey(args[0]);
-                if (headersWhite.indexOf(hKey) !== -1) {
+                const hKey:string = formatHeadersKey(args[0]);
+                if (_support.options.filterHttpHeadersWhite?.length) {
+                    // @ts-ignore
+                    !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) && (this.king_web_eye_xhr.headers[hKey] = args[1]);
+                } else {
                     // @ts-ignore
                     this.king_web_eye_xhr.headers[hKey] = args[1];
                 }
@@ -180,40 +188,69 @@ export default class HttpProxy {
                     }
                 }
                 const domain = getDomainUrl(url);
-                on(this, "loadend", () => {
+                on(this, 'readystatechange', () => {
                     if (that.isFilterHttpUrl(url)) return;
 
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
 
-                    report({
-                        type: ReportTypeEnum.XHR,
-                        data: {
-                            status: NetworkErrorEnum.SUCCESS,
-                            url: `${domain.origin}${domain.pathname}`,
-                            method,
-                            headers,
-                            params,
-                            time,
+                    if (this.readyState === 4) {
+                        if (this.status >= 200 && this.status < 300) {
+                            if (_support.options.transformResponse) {
+                                _support.options.transformResponse(this.responseText);
+                            } else {
+                                const data = stringToJSON(this.responseText);
+                                if (data?.code !== 200) {
+                                    reportLogs({
+                                        type: ReportTypeEnum.XHR,
+                                        data: {
+                                            network: NetworkErrorEnum.SUCCESS,
+                                            status: this.status,
+                                            url: `${domain.origin}${domain.pathname}`,
+                                            method,
+                                            headers,
+                                            params,
+                                            time,
+                                        }
+                                    })
+                                }
+                            }
+                        } else if (this.status === 0) {
+                            reportLogs({
+                                type: ReportTypeEnum.XHR,
+                                data: {
+                                    network: NetworkErrorEnum.ERROR,
+                                    status: this.status,
+                                    url,
+                                    method,
+                                    headers,
+                                    params,
+                                    time,
+                                    isCross: that.isCrossOriginXhrError(this),
+                                },
+                            })    
+                        } else {
+                            logger.log('xhr status', this.status);
                         }
-                    })
-                });
+                    }
+                })
                 on(this, "error", (err) => {
                     if (that.isFilterHttpUrl(url)) return;
 
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
 
-                    report({
+                    reportLogs({
                         type: ReportTypeEnum.XHR,
                         data: {
-                            status: NetworkErrorEnum.ERROR,
+                            network: NetworkErrorEnum.ERROR,
+                            status: this.status,
                             url,
                             method,
                             headers,
                             params,
                             time,
-                            isCross: that.isCrossOriginFetchError(err),
+                            isCross: that.isCrossOriginXhrError(err),
                         },
                     })
                 })
@@ -223,19 +260,35 @@ export default class HttpProxy {
         });
     }
 
-    // 过滤上报域名报错，过滤用户配置域名
+    /**
+     * 判断给定的 URL 是否需要过滤
+     *
+     * @param url 待判断的 URL 字符串
+     * @returns 如果 URL 包含特定的 DSN 或者 filterHttpUrl 列表为空，则返回 true，否则返回 false
+     */
     isFilterHttpUrl(url: string): boolean {
-        return url.indexOf(_support.options.dsn) !== -1
-        || _support.options?.filterHttpUrl?.indexOf(url) === -1
+        // 判断当前域名是上报的域名
+        if (url.indexOf(_support.options.dsn) !== -1) return true;
+        // 没有白名单直接返回false
+        if (!_support.options.filterHttpUrlWhite?.length) return false;
+        // filterHttpUrl 中可能会有正则, 字符串
+        return filterWhiteList(_support.options.filterHttpUrlWhite, url);
     }
 
-    // fetch 判断是否跨域
+    /**
+     * 判断是否是跨域请求错误
+     *
+     * @param error 错误对象
+     * @returns 如果是跨域请求错误则返回true，否则返回false
+     */
     isCrossOriginFetchError(error: Error) {
         return error.message === 'Failed to fetch' || error.message === 'Network request failed';
     }
 
     // xhr 判断是否跨域
     isCrossOriginXhrError(xhr: XMLHttpRequest) {
-        return xhr.status === 0 && xhr.statusText === '' && xhr.getAllResponseHeaders() === '';
+        return xhr.status === 0 
+        && xhr.statusText === '' 
+        && (isFunction(xhr?.getAllResponseHeaders) && xhr.getAllResponseHeaders() === '');
     }
 }

@@ -26,6 +26,12 @@ export default class ActionRecord {
             }, 5000);
         })
 
+        // 自定义触发上报行为数据
+        _support.events.on('SEDN_REPORT_CLICK_RECORD', (id: string) => {
+            this.errorId = id;
+            this.reportRecordData(true);
+        })
+
         // 立即上报，避免用户关闭浏览器，导致行为未上报
         _support.events.on("report_record_song", () => {
             this.reportRecordData(true);
@@ -54,12 +60,12 @@ export default class ActionRecord {
                     }
                 },
                 sampling: {
-                    scroll: 600, // 每 300ms 最多触发一次
+                    scroll: 800, // 每 800ms 最多触发一次
                     media: 1000, // 录制媒体间隔时长
                     input: "last", // 连续输入时，只录制最终值
                 },
                 maskAllInputs: true, // 将所有输入内容记录为 *
-                checkoutEveryNth: 100, // 每 N 次事件重新制作一次全量快照
+                checkoutEveryNth: 70, // 每 N 次事件重新制作一次全量快照
             });
         }
     }
@@ -69,7 +75,7 @@ export default class ActionRecord {
         this.curRecord && this.curRecord();
 
         // 开发环境，停止录制就上报
-        if (_support.options.level === LOG_LEVEL_ENUM.DEBUG) {
+        if (_support.options.logLevel === LOG_LEVEL_ENUM.DEBUG) {
             this.reportRecordData();
         }
     }

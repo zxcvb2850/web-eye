@@ -7,8 +7,7 @@ import {
     typeOf,
     WebIndexedDB
 } from "../utils";
-import {LOG_LEVEL_ENUM, ReportTypeEnum} from "../types";
-import reportLogs from '../report';
+import {LOG_LEVEL_ENUM} from "../types";
 
 class Logger {
     private db: WebIndexedDB | null = null;
@@ -152,7 +151,7 @@ class Logger {
     }
 
     reportConsoleData(data: any){
-        console.info("===上报 console 信息===", data);
+        this.log("===上报 console 信息===", data);
         // reportLogs({
         //     type: ReportTypeEnum.CONSOLE,
         //     data

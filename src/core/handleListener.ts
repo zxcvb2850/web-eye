@@ -1,6 +1,7 @@
 import { _global, _support, getErrorType, getMd5, on, parseStackError, getTimestamp, getUuid } from "../utils";
-import { ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown } from "../types";
-import reportLogs from "../report";
+import { ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown, ReactErrorBoundary } from "../types";
+import logger from "../logger";
+import reportLogs from '../report';
 
 export default class HandleListener {
     private cacheMap = new Map<string, number>();
@@ -8,21 +9,29 @@ export default class HandleListener {
     constructor() {
         this.windowError();
         this.rejectError();
+        this.listener();
+    }
+
+    private listener() {
+        _support.events.on('REACT_ERROR_BOUNDARY', this.reactCodeError.bind(this));
     }
 
     private windowError() {
         on(_global, "error", (event: ErrorEvent) => {
-            if (this.adaptReact()) return true;
-            const eventType = getErrorType(event);
-            if (eventType === ErrorTypeEnum.RS) {
-                // 资源加载异常
-                this.resourcesError(event, eventType);
-            } else if(eventType === ErrorTypeEnum.CS) {
-                // 跨域
-                this.resourcesError(event, eventType);
-            } else if (eventType === ErrorTypeEnum.JS) {
-                this.scriptCodeError(event, eventType);
+            if (!_global.isErrorHandledByBoundary){
+                if (this.adaptReact()) return true;
+                const eventType = getErrorType(event);
+                if (eventType === ErrorTypeEnum.RS) {
+                    // 资源加载异常
+                    this.resourcesError(event, eventType);
+                } else if(eventType === ErrorTypeEnum.CS) {
+                    // 跨域
+                    this.resourcesError(event, eventType);
+                } else if (eventType === ErrorTypeEnum.JS) {
+                    this.scriptCodeError(event, eventType);
+                }
             }
+            _global.isErrorHandledByBoundary = false;
         }, true);
     }
 
@@ -48,12 +57,16 @@ export default class HandleListener {
 
     // 资源加载错误
     private resourcesError(event: ErrorEvent, type: ErrorTypeEnum) {
-        const cTarget = event.target || event.srcElement
-        const url = (cTarget as HTMLImageElement).src || (cTarget as HTMLAnchorElement).href;
-        const localName = (cTarget as HTMLElement).localName;
-        const id = getMd5(`${url}${localName}`);
+        if (type === ErrorTypeEnum.CS) {
+            logger.warn("跨域资源加载失败");
+        } else {
+            const cTarget = event.target || event.srcElement
+            const url = (cTarget as HTMLImageElement).src || (cTarget as HTMLAnchorElement).href;
+            const localName = (cTarget as HTMLElement).localName;
+            const id = getMd5(`${url}${localName}`);
 
-        this.reportRecordData(id, ReportTypeEnum.RESOURCES, {id, type, url, localName})
+            this.reportRecordData(id, ReportTypeEnum.RESOURCES, {id, type, url, localName})
+        }
     }
 
     // 代码执行错误
@@ -72,6 +85,26 @@ export default class HandleListener {
         if (isReport) {
             // 发送事件
             _support.events.emit(ReportTypeEnum.CODE, errorId);
+        }
+    }
+
+    // React ErrorBoundary 错误边界
+    private reactCodeError(error: Error, errorInfo: ReactErrorBoundary) {
+        const stacks = parseStackError({stack: errorInfo.componentStack});
+        if (stacks?.length) {
+            const id = getMd5(`${error.message}${stacks[0].fileName}${stacks[0].lineno}${stacks[0].colno}`);
+            const errorId = getUuid();
+            
+            const isReport = this.reportRecordData(id, ReportTypeEnum.REACT, {
+                msg: error.message,
+                frames: JSON.stringify(stacks),
+                errorId,
+            })
+
+            if (isReport) {
+                // 发送事件
+                _support.events.emit(ReportTypeEnum.CODE, errorId);
+            }
         }
     }
 
