@@ -10,17 +10,17 @@ export default {
     input: 'src/index.ts',
     output: [
         {
-            file: 'dist/bundle.cjs.js',
+            file: 'dist/webEyeSDK.cjs.js',
             format: 'cjs',
             sourcemap: true,
         },
         {
-            file: 'dist/bundle.esm.js',
+            file: 'dist/webEyeSDK.esm.js',
             format: 'esm',
             sourcemap: true,
         },
         {
-            file: 'dist/bundle.umd.js',
+            file: 'dist/webEyeSDK.umd.js',
             format: 'umd',
             name: 'FrontendMonitoring',
             sourcemap: true,

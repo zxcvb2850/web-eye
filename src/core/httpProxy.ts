@@ -14,7 +14,27 @@ import {IAnyObject, NetworkErrorEnum, ReportTypeEnum} from "../types";
 import logger from '../logger';
 import reportLogs from '../report';
 
+// fetch 请求类型
+enum FetchResponseType {
+    'video/x-matroska' = 'video/x-matroska',
+    'blapplication/octet-streamob' = 'application/octet-stream',
+    'document' = 'document',
+    'application/json' = 'application/json',
+    'text/plain' = 'text/plain',
+}
+
+// XHR 请求类型
+enum XMLHttpRequestResponseType {
+    'arraybuffer' = 'arraybuffer',
+    'blob' = 'blob',
+    'document' = 'document',
+    'json' = 'json',
+    'text' = 'text',
+}
+
 export default class HttpProxy {
+    private isXhrError = false;
+
     constructor() {
         this.proxyFetch();
         this.proxyXmlHttp();
@@ -86,26 +106,55 @@ export default class HttpProxy {
                     }
                 }
 
+                const originPathName = `${domain.origin}${domain.pathname}`;
+
                 return originalFetch.apply(_global, [input, config])
                     .then((res: Response) => {
+                        // console.log("===fetch res type===", res.type);
+                        // console.log("===fetch res status===", res.status);
+                        // console.log("===fetch res statustext===", res.statusText);
+                        // console.log("===fetch res url===", res.url);
+                        // console.log("===fetch res headers===", headers);
                         const clone = res.clone();
-                        clone.text().then(() => {
+                        clone.text().then((bodyRes) => {
                             if(that.isFilterHttpUrl(requestUrl)) return;
 
                             const endTime = getTimestamp();
                             const time = endTime - startTime;
+                            let body = stringToJSON(bodyRes);
 
-                            reportLogs({
-                                type: ReportTypeEnum.FETCH,
-                                data: {
-                                    network: NetworkErrorEnum.SUCCESS,
-                                    url: `${domain.origin}${domain.pathname}`,
-                                    method,
-                                    headers: headersObj,
-                                    params,
-                                    time,
+                            if (_support.options.transformResponse) {
+                                body = _support.options.transformResponse(originPathName, body);
+                                !!body && reportLogs({
+                                    type: ReportTypeEnum.FETCH,
+                                    data: {
+                                        network: NetworkErrorEnum.SUCCESS,
+                                        status: res.status,
+                                        url: originPathName,
+                                        method,
+                                        headers: headersObj,
+                                        params,
+                                        body,
+                                        time,
+                                    }
+                                })
+                            } else {
+                                if (body?.code !== 200) {
+                                    reportLogs({
+                                        type: ReportTypeEnum.FETCH,
+                                        data: {
+                                            network: NetworkErrorEnum.SUCCESS,
+                                            status: res.status,
+                                            url: originPathName,
+                                            method,
+                                            headers: headersObj,
+                                            params,
+                                            body,
+                                            time,
+                                        }
+                                    })
                                 }
-                            })
+                            }
                         })
                         return res;
                     }, (err: Error) => {
@@ -116,8 +165,8 @@ export default class HttpProxy {
                         reportLogs({
                             type: ReportTypeEnum.FETCH,
                             data: {
-                                network: NetworkErrorEnum.SUCCESS,
-                                url: `${domain.origin}${domain.pathname}`,
+                                network: NetworkErrorEnum.ERROR,
+                                url: originPathName,
                                 method,
                                 headers: headersObj,
                                 params,
@@ -140,7 +189,7 @@ export default class HttpProxy {
         replaceOriginal(originalXHRProto, 'open', (originalOpen) => {
             return function (this: XMLHttpRequest, ...args: any[]): void {
                 // @ts-ignore
-                this.king_web_eye_xhr = {
+                this._web_eye_sdk_xhr = {
                     startTime: getTimestamp(),
                     url: args[1],
                     method: args[0].toUpperCase(),
@@ -151,17 +200,17 @@ export default class HttpProxy {
         replaceOriginal(originalXHRProto, "setRequestHeader", (originalHeader) => {
             return function (this: XMLHttpRequest, ...args: any[]): void {
                 // @ts-ignore
-                if (!this.king_web_eye_xhr?.headers) {
+                if (!this._web_eye_sdk_xhr?.headers) {
                     // @ts-ignore
-                    this.king_web_eye_xhr.headers = {};
+                    this._web_eye_sdk_xhr.headers = {};
                 }
                 const hKey:string = formatHeadersKey(args[0]);
                 if (_support.options.filterHttpHeadersWhite?.length) {
                     // @ts-ignore
-                    !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) && (this.king_web_eye_xhr.headers[hKey] = args[1]);
+                    !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) && (this._web_eye_sdk_xhr.headers[hKey] = args[1]);
                 } else {
                     // @ts-ignore
-                    this.king_web_eye_xhr.headers[hKey] = args[1];
+                    this._web_eye_sdk_xhr.headers[hKey] = args[1];
                 }
                 originalHeader.apply(this, args);
             }
@@ -169,22 +218,17 @@ export default class HttpProxy {
         replaceOriginal(originalXHRProto, 'send', (originalSend) => {
             return function (this: XMLHttpRequest, ...args: any[]): void {
                 // @ts-ignore
-                const {startTime, url, method, headers} = this.king_web_eye_xhr;
+                const {startTime, url, method, headers} = this._web_eye_sdk_xhr;
                 // 获取请求参数
                 let params: any = null;
                 if (method === 'GET') {
-                    params = getQueryParams(url);
+                    params = args[0] ? parseUrlEncodedBody(args[0]) : getQueryParams(url);
                 } else if (method === 'POST' || method === 'PUT') {
                     const contentType = headers['Content-Type'];
                     if (contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
                         params = parseUrlEncodedBody(args[0] as string);
                     } else {
-                        try {
-                            params = JSON.parse(args[0] as string);
-                        } catch (e) {
-                            // 不是 JSON 格式
-                            params = args[0];
-                        }
+                        params = stringToJSON(args[0]);
                     }
                 }
                 const domain = getDomainUrl(url);
@@ -193,49 +237,55 @@ export default class HttpProxy {
 
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
+                    const originPathName = `${domain.origin}${domain.pathname}`;
 
                     if (this.readyState === 4) {
                         if (this.status >= 200 && this.status < 300) {
+                            const responseType = that.responseXhrType(this.responseType);
+                            const isTextJson = responseType === 'text' || responseType === 'json';
+                            // text json 类型的格式才需要转换
+                            let body = isTextJson ? stringToJSON(this.responseText) : responseType;
                             if (_support.options.transformResponse) {
-                                const isReport = _support.options.transformResponse(this.responseText);
-                                if (!!isReport) {
-                                    reportLogs({
-                                        type: ReportTypeEnum.XHR,
-                                        data: {
-                                            network: NetworkErrorEnum.SUCCESS,
-                                            status: this.status,
-                                            url: `${domain.origin}${domain.pathname}`,
-                                            method,
-                                            headers,
-                                            params,
-                                            time,
-                                        }
-                                    })
-                                }
+                                body = _support.options.transformResponse(originPathName, body);
+                                !!body && reportLogs({
+                                    type: ReportTypeEnum.XHR,
+                                    data: {
+                                        network: NetworkErrorEnum.SUCCESS,
+                                        status: this.status,
+                                        url: originPathName,
+                                        method,
+                                        headers,
+                                        params,
+                                        body,
+                                        time,
+                                    }
+                                })
                             } else {
-                                const data = stringToJSON(this.responseText);
-                                if (data?.code !== 200) {
+                                if (body?.code !== 200 || !isTextJson) {
                                     reportLogs({
                                         type: ReportTypeEnum.XHR,
                                         data: {
                                             network: NetworkErrorEnum.SUCCESS,
                                             status: this.status,
-                                            url: `${domain.origin}${domain.pathname}`,
+                                            url: originPathName,
                                             method,
                                             headers,
                                             params,
+                                            body,
                                             time,
                                         }
                                     })
                                 }
                             }
                         } else if (this.status === 0) {
+                            that.isXhrError = true;
+
                             reportLogs({
                                 type: ReportTypeEnum.XHR,
                                 data: {
                                     network: NetworkErrorEnum.ERROR,
                                     status: this.status,
-                                    url,
+                                    url: originPathName,
                                     method,
                                     headers,
                                     params,
@@ -250,6 +300,10 @@ export default class HttpProxy {
                 })
                 on(this, "error", (err) => {
                     if (that.isFilterHttpUrl(url)) return;
+                    if (that.isXhrError) {
+                        that.isXhrError = false;
+                        return;
+                    }
 
                     const endTime = getTimestamp();
                     const time = endTime - startTime;
@@ -278,7 +332,7 @@ export default class HttpProxy {
      * 判断给定的 URL 是否需要过滤
      *
      * @param url 待判断的 URL 字符串
-     * @returns 如果 URL 包含特定的 DSN 或者 filterHttpUrl 列表为空，则返回 true，否则返回 false
+     * @returns 如果 URL 包含特定的 DSN 或者 filterHttpUrl 列表为空，则返回 true 拦截，否则返回 false 不拦截
      */
     isFilterHttpUrl(url: string): boolean {
         // 判断当前域名是上报的域名
@@ -299,10 +353,32 @@ export default class HttpProxy {
         return error.message === 'Failed to fetch' || error.message === 'Network request failed';
     }
 
-    // xhr 判断是否跨域
+    /**
+     * 判断是否是一个跨域 XMLHttpRequest 产生的错误
+     *
+     * @param xhr XMLHttpRequest 实例
+     * @returns 如果是跨域 XMLHttpRequest 产生的错误则返回 true，否则返回 false
+     */
     isCrossOriginXhrError(xhr: XMLHttpRequest) {
         return xhr.status === 0 
         && xhr.statusText === '' 
         && (isFunction(xhr?.getAllResponseHeaders) && xhr.getAllResponseHeaders() === '');
+    }
+
+    responseFetchType(contentType: string): FetchResponseType {
+        return contentType as FetchResponseType;
+    }
+
+    /**
+     * 根据给定的类型返回相应的 XMLHttpRequest 响应类型。
+     *
+     * @param type 字符串类型，表示期望的 XMLHttpRequest 响应类型。
+     * @returns 返回对应的 XMLHttpRequestResponseType 枚举值。
+     * 如果传入的类型为空字符串，则返回 'text' 类型。
+     */
+    responseXhrType(type: string): XMLHttpRequestResponseType {
+        if (type === '') return XMLHttpRequestResponseType.text;
+
+        return type as XMLHttpRequestResponseType;
     }
 }

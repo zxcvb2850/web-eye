@@ -2,10 +2,10 @@ import ReactDOM from 'react-dom/client'
 import {HashRouter} from "react-router-dom";
 import ErrorBoundary from "./components/ErrorBoundary";
 import App from './App.tsx'
-import KingWebEye from '../../src';
+import webEyeSDK from '../../src';
 import './index.css'
 
-KingWebEye.init({
+webEyeSDK.init({
     dsn: "http://127.0.0.1:4567/api/report-logs",
     appid: "6695034c40c7768292753691",
     isPlayback: false,
@@ -13,8 +13,8 @@ KingWebEye.init({
     isActionRecord: true, // 是否开启屏幕动作录制
 })
 
-KingWebEye.setParams("source", 1);
-KingWebEye.setParams("channelId", "1000");
+webEyeSDK.setParams("source", 1);
+webEyeSDK.setParams("channelId", "1000");
 
 const script = document.createElement("script");
 script.src = "/abc.jsx";
@@ -24,8 +24,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
         <HashRouter>
             <h2 onClick={() => {
-                KingWebEye.setOptions("level", 4);
-                KingWebEye.setOptions("isActionRecord", false);
+                webEyeSDK.setOptions("logLevel", 4);
+                webEyeSDK.setOptions("isActionRecord", false);
             }}>=====</h2>
             <App/>
         </HashRouter>

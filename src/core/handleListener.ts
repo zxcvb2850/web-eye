@@ -57,6 +57,7 @@ export default class HandleListener {
 
     // 资源加载错误
     private resourcesError(event: ErrorEvent, type: ErrorTypeEnum) {
+        if (_support.options?.transformResource && _support.options?.transformResource(event, type)) return;
         if (type === ErrorTypeEnum.CS) {
             logger.warn("跨域资源加载失败");
         } else {

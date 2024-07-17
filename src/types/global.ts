@@ -1,7 +1,7 @@
-import {EventsBusFace, IAnyObject} from "./base";
+import {EventsBusFace, IAnyObject, ErrorTypeEnum} from "./base";
 
 export interface Window {
-    __king_web_eye__: any;
+    __web_eye_sdk__: any;
     isBlockBeacon: boolean; // sendBeacon 是否被拦截
     navigator: Navigator,
     screen: any;
@@ -18,7 +18,7 @@ export interface Window {
     isErrorHandledByBoundary: boolean; // 标记 React 收到错误
 }
 
-export interface KingWebEye {
+export interface webEyeSDK {
     name: string;
     version: string;
     devices: any;
@@ -47,7 +47,8 @@ export interface OptionsFace {
     maxClickLimit?: number; // 记录点击数量
     filterHttpUrlWhite?: (string | RegExp)[]; // 过滤需要上报的白名单
     filterHttpHeadersWhite?: (string | RegExp)[]; // 由于隐私问题，过滤请求接口中的Header白名单
-    transformResponse: null | ((res: string) => boolean); // 自定义请求响应上报数据
+    transformResponse?: null | ((url: string, res: string) => any); // 自定义请求响应上报数据
+    transformResource?: null | ((event: ErrorEvent, type: ErrorTypeEnum) => boolean); // 自定义是否上报资源异常
 }
 
 // 自定义参数

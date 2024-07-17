@@ -12,8 +12,7 @@ class ReportLogs {
    * @param {ReportDataFace} data 需要上报的内容
    * @param {boolean} isSong 是否立即上报
    * */
-  sendSystem(data: ReportSystemDataFace, isSong = false) {    
-    console.info('====data.type====', data.type);
+  sendSystem(data: ReportSystemDataFace, isSong = false) {
     if (data.type === ReportTypeEnum.PERFORMANCE || data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
       if (_support.options.debug) {
         this.requestIdleCallback(()=> this.reportSendBeacon(data), isSong);

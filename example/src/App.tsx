@@ -6,7 +6,7 @@ import 'rrweb/dist/rrweb.min.css';
 import IndexPage from "./views/IndexPage";
 import AboutPage from "./views/AboutPage";
 import LayoutPage from "./views/LayoutPage";
-import KingWebEye from '../../src';
+import webEyeSDK from '../../src';
 import './App.css'
 
 function App() {
@@ -35,7 +35,7 @@ function App() {
             .then(res => res.text())
             .then(res => console.info("---res---", res));*/
 
-        KingWebEye.sendCustom(2222, {a: 111, b: '222'});
+        webEyeSDK.sendCustom(2222, {a: 111, b: '222'});
     }
 
     const clickLoadSourceError = () => {
@@ -80,7 +80,7 @@ function App() {
     const clickRecord = async () => {}
     // 播放回放
     const clickPlayback = () => {
-        KingWebEye.setOptions("isActionRecord", false);
+        webEyeSDK.setOptions("isActionRecord", false);
         setTimeout(() => {
             const record = window.localStorage.getItem("test-record");
             if (record) {

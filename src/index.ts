@@ -24,7 +24,7 @@ import reportLogs from './report'
 /**
  * 入口文件
  * */
-class KingWebEye {
+class webEyeSDK {
     protected _initialized = false; // 是否已经初始化
     public options: OptionsFace;
     private actionRecord: ActionRecord | null = null;
@@ -35,12 +35,10 @@ class KingWebEye {
             appid: "",
             logLevel: LOG_LEVEL_ENUM.DEBUG,
             isConsole: true,
-            maxRecordLimit: 30,
+            maxRecordLimit: 50,
             isRecordClick: true,
             maxClickLimit: 20,
             filterHttpUrlWhite: [new RegExp('chunk.js.map$'), new RegExp('.chunk.js$'), new RegExp('.hot-update.json$')],
-            filterHttpHeadersWhite: [],
-            transformResponse: null,
         };
 
         _support.options = this.options;
@@ -96,7 +94,7 @@ class KingWebEye {
             logger.setLevel(LOG_LEVEL_ENUM.DEBUG);
             this.options.debug = options.debug;
         }
-        if (validateOptions(options.logLevel, "level", "number", true)) {
+        if (validateOptions(options.logLevel, "logLevel", "number", true)) {
             this.options.logLevel = options.logLevel;
             !this.options.debug && logger.setLevel(options.logLevel as number);
         }
@@ -121,6 +119,7 @@ class KingWebEye {
         validateOptions(options.filterHttpUrlWhite, "filterHttpUrlWhite", "array", true) && (this.options.filterHttpUrlWhite = [...this.options.filterHttpUrlWhite!, ...options.filterHttpUrlWhite!]);
         validateOptions(options.filterHttpHeadersWhite, "filterHttpHeadersWhite", "array", true) && (this.options.filterHttpHeadersWhite = options.filterHttpHeadersWhite);
         validateOptions(options.transformResponse, "transformResponse", "function", true) && (this.options.transformResponse = options.transformResponse);
+        validateOptions(options.transformResource, "transformResource", "function", true) && (this.options.transformResource = options.transformResource);
 
         // 日志初始化
         logger.init();
@@ -190,8 +189,8 @@ class KingWebEye {
     }
 }
 
-const instance = new KingWebEye();
+const instance = new webEyeSDK();
 
-_global.__king_web_eye__ = Object.assign(instance, _support);
+_global.__web_eye_sdk__ = Object.assign(instance, _support);
 
 export default instance;

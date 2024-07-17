@@ -1,5 +1,5 @@
 import packageJson from "../../package.json";
-import {KingWebEye, Window} from "../types";
+import {webEyeSDK, Window} from "../types";
 import {docScreenW, docScreenH} from './index';
 
 export const _global = getGlobal();
@@ -15,7 +15,7 @@ _support.devices = {
     docScreen: `${docScreenW()}x${docScreenH()}`,
 }
 
-function getSupport(): KingWebEye{
-    _global.__king_web_eye__ = (_global.__king_web_eye__ || ({} as KingWebEye));
-    return _global.__king_web_eye__;
+function getSupport(): webEyeSDK{
+    _global.__web_eye_sdk__ = (_global.__web_eye_sdk__ || ({} as webEyeSDK));
+    return _global.__web_eye_sdk__;
 }
