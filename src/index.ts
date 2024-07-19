@@ -35,7 +35,7 @@ class webEyeSDK {
             appid: "",
             logLevel: LOG_LEVEL_ENUM.DEBUG,
             isConsole: true,
-            maxRecordLimit: 50,
+            maxRecordLimit: 70,
             isRecordClick: true,
             maxClickLimit: 20,
             filterHttpUrlWhite: [new RegExp('chunk.js.map$'), new RegExp('.chunk.js$'), new RegExp('.hot-update.json$')],
@@ -132,8 +132,12 @@ class webEyeSDK {
     }
 
     setOptions(key: keyof OptionsFace, value: OptionsFace[keyof OptionsFace]) {
-        if (key === "dsn" || key === "appid") {
-            logger.warn(`Unable to set ${key} field`);
+        if (key === 'appid') {
+            logger.warn(`appid can not be modified`);
+            return;
+        }
+        if (key === "dsn") {
+            logger.warn(`Unable to set dsn field`);
             return false;
         }
         if (this.options.hasOwnProperty(key)) {

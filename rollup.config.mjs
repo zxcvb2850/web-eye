@@ -32,7 +32,12 @@ export default {
         wasm(),
         typescript({ tsconfig: './tsconfig.json' }),
         json(),
-        terser(),
+        terser({
+            compress: {
+                drop_console: true,
+                drop_debugger: true,
+            }
+        }),
         livereload({
             watch: 'dist',
         }),

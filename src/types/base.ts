@@ -63,6 +63,7 @@ export enum ReportTypeEnum {
     CONSOLE = "console", // console
     OTHER = "other", // 其他，预留类型
     CUSTOM = "custom", // 自定义
+    CHECK = "check", // 检测
 }
 
 /**

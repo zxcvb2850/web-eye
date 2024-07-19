@@ -218,9 +218,19 @@ export function jsonToString(data: any) {
   try {
     return JSON.stringify(data);
   } catch (err) {
-    logger.error(err);
+    logger.warn(err);
     return data;
   }
+}
+
+// 是否可以转为 json 对象
+export function isJsonString(str: string) {
+  try {
+    JSON.parse(str);
+  } catch (e) {
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -228,12 +238,8 @@ export function jsonToString(data: any) {
  */
 export function stringToJSON(data: any) {
   if (!data) return data;
-  try {
-    return JSON.parse(data);
-  } catch (err) {
-    logger.error(err);
-    return data;
-  }
+
+  return isJsonString(data) ? JSON.parse(data): data;
 }
 
 /**
@@ -245,7 +251,7 @@ export function zip(data: any) {
     const dataJsonStr = isString(data) ? data : jsonToString(data);
     return pako.gzip(dataJsonStr);
   } catch (err) {
-    logger.error(err);
+    logger.warn(err);
     return data;
   }
 }

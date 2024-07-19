@@ -2,7 +2,6 @@ import {EventsBusFace, IAnyObject, ErrorTypeEnum} from "./base";
 
 export interface Window {
     __web_eye_sdk__: any;
-    isBlockBeacon: boolean; // sendBeacon 是否被拦截
     navigator: Navigator,
     screen: any;
     document: Document;
