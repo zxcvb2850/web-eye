@@ -1,6 +1,6 @@
 import { _global, getCacheData, localStorageRouter, on, replaceOriginal, setCacheData } from '../utils';
-import { ReportTypeEnum } from '../types';
-import report from '../report';
+import { ReportEventEnum } from '../types';
+import reportLogs from '../report';
 
 export default class HistoryRouter {
   constructor() {
@@ -13,8 +13,8 @@ export default class HistoryRouter {
       const { oldURL, newURL } = event;
       setCacheData(localStorageRouter, newURL);
 
-      report({
-        type: ReportTypeEnum.HASHCHANGE,
+      reportLogs({
+        event: ReportEventEnum.HASHCHANGE,
         data: { old: oldURL, new: newURL, type: 'hashchange' },
       })
     })
@@ -28,8 +28,8 @@ export default class HistoryRouter {
         const newPath = `${origin}${args[2]}`;
         setCacheData(localStorageRouter, newPath);
 
-        report({
-          type: ReportTypeEnum.HISTORY,
+        reportLogs({
+          event: ReportEventEnum.HISTORY,
           data: { old: href, new: newPath, type: 'pushState' },
         })
         originalPushState.apply(this, args);
@@ -41,8 +41,8 @@ export default class HistoryRouter {
         const { value: oldPath, time } = getCacheData(localStorageRouter);
         setCacheData(localStorageRouter, href);
 
-        report({
-          type: ReportTypeEnum.HISTORY,
+        reportLogs({
+          event: ReportEventEnum.HISTORY,
           data: { old: oldPath, new: href, type: 'replaceState' },
         })
         originalReplaceState.apply(this, args);

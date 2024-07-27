@@ -1,5 +1,5 @@
 import { _global, _support, jsonToString, zip, isString, isNumber, on, stringToJSON, isJsonString } from '../utils';
-import { Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum, ReportNetEnum } from '../types'
+import { Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum, ReportEventEnum, ReportNetEnum } from '../types'
 import logger from '../logger';
 
 class ReportLogs {
@@ -15,14 +15,15 @@ class ReportLogs {
    * @param {boolean} isSong 是否立即上报
    * */
   sendSystem(data: ReportSystemDataFace, isSong = false) {
-    if (data.type === ReportTypeEnum.PERFORMANCE || data.type === ReportTypeEnum.HASHCHANGE || data.type === ReportTypeEnum.HISTORY || data.type === ReportTypeEnum.RESOURCES) {
+    data.type = ReportTypeEnum.SYSTEM;
+    if (data.event === ReportEventEnum.PERFORMANCE || data.event === ReportEventEnum.HASHCHANGE || data.event === ReportEventEnum.HISTORY || data.event === ReportEventEnum.RESOURCES) {
       if (_support.options.debug) {
         this.requestIdleCallback(()=> this.reportSendBeacon(data), isSong);
       } else {
         this.requestIdleCallback(()=> this.reportSendBeaconBuffer(data), isSong);
       }
     }
-    else if (data.type === ReportTypeEnum.CLICK || data.type === ReportTypeEnum.ACTION_RECORD){
+    else if (data.event === ReportEventEnum.CLICK || data.event === ReportEventEnum.ACTION_RECORD){
       this.requestIdleCallback(() => this.reportSendBeaconBuffer(data), isSong);
     }
     else {
@@ -35,7 +36,7 @@ class ReportLogs {
   }
 
   // 自定义日志上报
-  sendCustom(event: string | number, data: ReportCustomDataFace, reportType: ReportNetEnum = ReportNetEnum.FETCH) {
+  sendCustom(event: ReportEventEnum | string | number, data: ReportCustomDataFace, reportType: ReportNetEnum = ReportNetEnum.FETCH) {
     if (!event || !(isString(event) || isNumber(event))) {
       logger.warn(`custom report event typeof is string or number`);
       return;
@@ -67,7 +68,7 @@ class ReportLogs {
     }
     if (data.event) reportParams.event = data.event;
     // 这两个事件无需上传额外参数
-    if (!(data.type === ReportTypeEnum.CLICK || data.type === ReportTypeEnum.ACTION_RECORD)) {
+    if (!(data.event === ReportEventEnum.CLICK || data.event === ReportEventEnum.ACTION_RECORD)) {
       reportParams.visitorId = _support.visitorId;
       reportParams.uuid = _support.uuid;
       reportParams.params = this.getParamsString(_support.params);

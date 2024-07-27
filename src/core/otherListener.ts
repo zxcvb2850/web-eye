@@ -1,5 +1,5 @@
 import { _global, _support, getTimestamp, on, throttle, debounce, docScreenW, docScreenH } from '../utils';
-import {ReportTypeEnum} from "../types";
+import {ReportEventEnum} from "../types";
 import reportLogs from '../report'
 
 interface ClickFace {
@@ -26,7 +26,7 @@ export default class OtherListener {
 
     listener() {
         // 代码报错后，6s 后上报行为数据
-        _support.events.on(ReportTypeEnum.CODE, (errorId: string) => {
+        _support.events.on(ReportEventEnum.CODE, (errorId: string) => {
             this.errorId = errorId;
             _support._click_delay_timer = setTimeout(() => {
                 this.reportClickData();
@@ -50,7 +50,7 @@ export default class OtherListener {
         _support._click_delay_timer = null;
 
         reportLogs({
-            type: ReportTypeEnum.CLICK,
+            event: ReportEventEnum.CLICK,
             data: this.clicks,
             errorId: this.errorId,
         }, isSong);

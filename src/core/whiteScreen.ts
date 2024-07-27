@@ -2,7 +2,7 @@
  * 启动白屏检测
  * */
 import {_global, _support, getTimestamp, on} from "../utils";
-import {ReportTypeEnum} from "../types";
+import {ReportEventEnum} from "../types";
 import report from '../report'
 
 const maxLoopCount = 10;
@@ -89,7 +89,7 @@ export default class WhiteScreen {
 
         if (status) {
             report({
-               type: ReportTypeEnum.WHITE_SCREEN,
+               event: ReportEventEnum.WHITE_SCREEN,
                data: {
                    status,
                    time: now - this.startTime

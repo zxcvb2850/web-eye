@@ -1,5 +1,5 @@
 import { _global, _support, getErrorType, getMd5, on, parseStackError, getTimestamp, getUuid } from "../utils";
-import { ErrorTypeEnum, ReportTypeEnum, StackFrameFace, UnKnown, ReactErrorBoundary } from "../types";
+import { ErrorTypeEnum, ReportEventEnum, StackFrameFace, UnKnown, ReactErrorBoundary } from "../types";
 import logger from "../logger";
 import reportLogs from '../report';
 
@@ -48,7 +48,7 @@ export default class HandleListener {
             }
             const id = getMd5(`${errorContent.msg}`);
 
-            this.reportRecordData(id, ReportTypeEnum.PROMISE, {
+            this.reportRecordData(id, ReportEventEnum.PROMISE, {
                 ...errorContent,
                 status: event?.reason.name || UnKnown,
             })
@@ -66,7 +66,7 @@ export default class HandleListener {
             const localName = (cTarget as HTMLElement).localName;
             const id = getMd5(`${url}${localName}`);
 
-            this.reportRecordData(id, ReportTypeEnum.RESOURCES, {id, type, url, localName})
+            this.reportRecordData(id, ReportEventEnum.RESOURCES, {id, type, url, localName})
         }
     }
 
@@ -77,7 +77,7 @@ export default class HandleListener {
         const id = getMd5(`${message}${filename}${lineno}${colno}`);
 
         const errorId = getUuid();
-        const isReport = this.reportRecordData(id, ReportTypeEnum.CODE, {
+        const isReport = this.reportRecordData(id, ReportEventEnum.CODE, {
             msg: message, frames: JSON.stringify(stacks),
             status: event?.error?.name || UnKnown,
             errorId,
@@ -85,7 +85,7 @@ export default class HandleListener {
 
         if (isReport) {
             // 发送事件
-            _support.events.emit(ReportTypeEnum.CODE, errorId);
+            _support.events.emit(ReportEventEnum.CODE, errorId);
         }
     }
 
@@ -96,7 +96,7 @@ export default class HandleListener {
             const id = getMd5(`${error.message}${stacks[0].fileName}${stacks[0].lineno}${stacks[0].colno}`);
             const errorId = getUuid();
             
-            const isReport = this.reportRecordData(id, ReportTypeEnum.REACT, {
+            const isReport = this.reportRecordData(id, ReportEventEnum.REACT, {
                 msg: error.message,
                 frames: JSON.stringify(stacks),
                 errorId,
@@ -104,13 +104,13 @@ export default class HandleListener {
 
             if (isReport) {
                 // 发送事件
-                _support.events.emit(ReportTypeEnum.CODE, errorId);
+                _support.events.emit(ReportEventEnum.CODE, errorId);
             }
         }
     }
 
     // 上报错误
-    private reportRecordData(id: string, type: ReportTypeEnum, data: any): boolean {
+    private reportRecordData(id: string, event: ReportEventEnum, data: any): boolean {
         const oldTime = this.cacheMap.get(id);
         const now = getTimestamp();
         let isReport = false;
@@ -121,7 +121,7 @@ export default class HandleListener {
         }
 
         if (isReport) {
-            reportLogs({type, data});
+            reportLogs({event, data});
         }
 
         return isReport;

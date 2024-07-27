@@ -153,7 +153,7 @@ class Logger {
     reportConsoleData(data: any){
         this.log("===上报 console 信息===", data);
         // reportLogs({
-        //     type: ReportTypeEnum.CONSOLE,
+        //     type: ReportEventEnum.CONSOLE,
         //     data
         // })
     }

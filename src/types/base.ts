@@ -44,10 +44,15 @@ export enum ReportNetEnum {
     BEACON = "beacon",
 }
 
+export enum ReportTypeEnum {
+    SYSTEM = 'system',
+    CUSTOM = 'custom',
+}
+
 /**
  * 上报类型
  * */
-export enum ReportTypeEnum {
+export enum ReportEventEnum {
     PERFORMANCE = "performance", // 性能检测
     FETCH = "fetch", // fetch 请求
     XHR = "xhr", // xhr 请求
@@ -62,7 +67,6 @@ export enum ReportTypeEnum {
     ACTION_RECORD = "action_record", // 录屏
     CONSOLE = "console", // console
     OTHER = "other", // 其他，预留类型
-    CUSTOM = "custom", // 自定义
     CHECK = "check", // 检测
 }
 
@@ -123,13 +127,13 @@ export enum LOG_LEVEL_ENUM {
  * SDK捕捉上报字段
  * */
 export interface ReportSystemDataFace {
-    type: ReportTypeEnum;
+    type?: ReportTypeEnum;
+
+    event?: ReportEventEnum | string | number;
 
     data: IAnyObject | string;
 
     errorId?: string;
-
-    event?: string | number;
 }
 
 /**

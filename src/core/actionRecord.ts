@@ -1,6 +1,6 @@
 import {record, EventType} from "rrweb";
-import {_support, isNumber} from "../utils";
-import {LOG_LEVEL_ENUM, ReportTypeEnum} from "../types";
+import {_support} from "../utils";
+import {LOG_LEVEL_ENUM, ReportEventEnum} from "../types";
 import reportLogs from "../report";
 
 export default class ActionRecord {
@@ -19,7 +19,7 @@ export default class ActionRecord {
     // 监听回调的方式上传行为日志
     listener() {
         // 代码报错后，6s 后上报行为数据
-        _support.events.on(ReportTypeEnum.CODE, (errorId: string) => {
+        _support.events.on(ReportEventEnum.CODE, (errorId: string) => {
             this.errorId = errorId;
             _support._record_delay_timer = setTimeout(() => {
                 this.reportRecordData();
@@ -85,7 +85,7 @@ export default class ActionRecord {
         _support._record_delay_timer = null;
 
         reportLogs({
-            type: ReportTypeEnum.ACTION_RECORD,
+            event: ReportEventEnum.ACTION_RECORD,
             data: [this.metaSnapshot, this.fullSnapshot, ...this.list],
             errorId: this.errorId,
         }, isSong)

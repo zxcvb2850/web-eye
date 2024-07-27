@@ -10,7 +10,7 @@ import {
     isFunction,
     stringToJSON,
 } from '../utils';
-import {IAnyObject, NetworkErrorEnum, ReportTypeEnum} from "../types";
+import {IAnyObject, NetworkErrorEnum, ReportEventEnum} from "../types";
 import logger from '../logger';
 import reportLogs from '../report';
 
@@ -93,8 +93,8 @@ export default class HttpProxy {
                 if (method === 'GET') {
                     params = getQueryParams(requestUrl);
                 } else if (method === 'POST' || method === 'PUT') {
-                    const contentType = headersObj['Content-Type'];
-                    if (contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
+                    const contentType = headersObj?.['Content-Type'] || null;
+                    if (contentType && contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
                         params = parseUrlEncodedBody(body);
                     } else {
                         try {
@@ -126,7 +126,7 @@ export default class HttpProxy {
                             if (_support.options.transformResponse) {
                                 body = _support.options.transformResponse(originPathName, body);
                                 !!body && reportLogs({
-                                    type: ReportTypeEnum.FETCH,
+                                    event: ReportEventEnum.FETCH,
                                     data: {
                                         network: NetworkErrorEnum.SUCCESS,
                                         status: res.status,
@@ -141,7 +141,7 @@ export default class HttpProxy {
                             } else {
                                 if (body?.code !== 200) {
                                     reportLogs({
-                                        type: ReportTypeEnum.FETCH,
+                                        event: ReportEventEnum.FETCH,
                                         data: {
                                             network: NetworkErrorEnum.SUCCESS,
                                             status: res.status,
@@ -163,7 +163,7 @@ export default class HttpProxy {
                         const endTime = getTimestamp();
                         const time = endTime - startTime;
                         reportLogs({
-                            type: ReportTypeEnum.FETCH,
+                            event: ReportEventEnum.FETCH,
                             data: {
                                 network: NetworkErrorEnum.ERROR,
                                 url: originPathName,
@@ -224,8 +224,8 @@ export default class HttpProxy {
                 if (method === 'GET') {
                     params = args[0] ? parseUrlEncodedBody(args[0]) : getQueryParams(url);
                 } else if (method === 'POST' || method === 'PUT') {
-                    const contentType = headers['Content-Type'];
-                    if (contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
+                    const contentType = headers?.['Content-Type'] || null;
+                    if (contentType && contentType?.indexOf('application/x-www-form-urlencoded') > -1) {
                         params = parseUrlEncodedBody(args[0] as string);
                     } else {
                         params = stringToJSON(args[0]);
@@ -248,7 +248,7 @@ export default class HttpProxy {
                             if (_support.options.transformResponse) {
                                 body = _support.options.transformResponse(originPathName, body);
                                 !!body && reportLogs({
-                                    type: ReportTypeEnum.XHR,
+                                    event: ReportEventEnum.XHR,
                                     data: {
                                         network: NetworkErrorEnum.SUCCESS,
                                         status: this.status,
@@ -263,7 +263,7 @@ export default class HttpProxy {
                             } else {
                                 if (body?.code !== 200 || !isTextJson) {
                                     reportLogs({
-                                        type: ReportTypeEnum.XHR,
+                                        event: ReportEventEnum.XHR,
                                         data: {
                                             network: NetworkErrorEnum.SUCCESS,
                                             status: this.status,
@@ -281,7 +281,7 @@ export default class HttpProxy {
                             that.isXhrError = true;
 
                             reportLogs({
-                                type: ReportTypeEnum.XHR,
+                                event: ReportEventEnum.XHR,
                                 data: {
                                     network: NetworkErrorEnum.ERROR,
                                     status: this.status,
@@ -309,7 +309,7 @@ export default class HttpProxy {
                     const time = endTime - startTime;
 
                     reportLogs({
-                        type: ReportTypeEnum.XHR,
+                        event: ReportEventEnum.XHR,
                         data: {
                             network: NetworkErrorEnum.ERROR,
                             status: this.status,

@@ -1,6 +1,6 @@
 import {onTTFB, onFCP, onLCP, onFID, onCLS} from "web-vitals";
 import {_global, afterLoad, getTimestamp} from "../utils";
-import {PerformanceEnum, RatingEnum, ReportTypeEnum, Callback} from "../types";
+import {PerformanceEnum, RatingEnum, ReportEventEnum, Callback} from "../types";
 import report from '../report';
 import logger from '../logger';
 
@@ -29,9 +29,9 @@ export default class WebVitals {
     }
 
     report (data: MetricFace) {
-        logger.log({ type: ReportTypeEnum.PERFORMANCE, data });
+        logger.log({ event: ReportEventEnum.PERFORMANCE, data });
 
-        report({ type: ReportTypeEnum.PERFORMANCE, data });
+        report({ event: ReportEventEnum.PERFORMANCE, data });
     }
 
     // TTFB (Time to First Byte)：从用户发起请求到浏览器接收到第一个字节数据的时间。
