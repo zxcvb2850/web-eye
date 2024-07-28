@@ -7,7 +7,8 @@ import {
     typeOf,
     WebIndexedDB
 } from "../utils";
-import {LOG_LEVEL_ENUM} from "../types";
+import {LOG_LEVEL_ENUM, ReportEventEnum} from "../types";
+import reportLogs from '../report';
 
 class Logger {
     private db: WebIndexedDB | null = null;
@@ -127,6 +128,7 @@ class Logger {
                     uuid: _support.uuid,
                     params: _support.params,
                     device: _support.devices,
+                    sdkVersion: _support.version,
                     content,
                 };
                 // 缓存 30s 日志，防止重复上报
@@ -152,10 +154,10 @@ class Logger {
 
     reportConsoleData(data: any){
         this.log("===上报 console 信息===", data);
-        // reportLogs({
-        //     type: ReportEventEnum.CONSOLE,
-        //     data
-        // })
+        reportLogs({
+            event: ReportEventEnum.CONSOLE,
+            data
+        })
     }
 }
 
