@@ -37,7 +37,7 @@ class webEyeSDK {
             isConsole: true,
             maxRecordLimit: 70,
             isRecordClick: true,
-            maxClickLimit: 20,
+            maxClickLimit: 100,
             filterHttpUrlWhite: [new RegExp('chunk.js.map$'), new RegExp('.chunk.js$'), new RegExp('.hot-update.json$')],
         };
 

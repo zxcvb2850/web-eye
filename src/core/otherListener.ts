@@ -9,6 +9,7 @@ interface ClickFace {
     x: number;
     y: number;
     time: number;
+    uuid: string;
     url: string;
 }
 
@@ -93,6 +94,7 @@ export default class OtherListener {
                 tagName: target.tagName,
                 x: event?.clientX || 0,
                 y: event?.clientY || 0,
+                uuid: _support.uuid,
                 time: getTimestamp(),
                 url: _global.location.href,
             });

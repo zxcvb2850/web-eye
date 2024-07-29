@@ -56,7 +56,7 @@ export default class ActionRecord {
                     }
                     const len = that.list.length;
                     if (len > _support.options.maxRecordLimit!) {
-                        that.list = that.list.splice(len - _support.options.maxRecordLimit!)
+                        that.list.shift();
                     }
                 },
                 sampling: {
@@ -65,7 +65,7 @@ export default class ActionRecord {
                     input: "last", // 连续输入时，只录制最终值
                 },
                 maskAllInputs: true, // 将所有输入内容记录为 *
-                checkoutEveryNth: 70, // 每 N 次事件重新制作一次全量快照
+                checkoutEveryNth: _support.options.maxRecordLimit, // 每 N 次事件重新制作一次全量快照
             });
         }
     }
@@ -84,9 +84,11 @@ export default class ActionRecord {
         clearTimeout(_support._record_delay_timer);
         _support._record_delay_timer = null;
 
+        const data = [this.metaSnapshot, this.fullSnapshot, ...this.list];
+
         reportLogs({
             event: ReportEventEnum.ACTION_RECORD,
-            data: [this.metaSnapshot, this.fullSnapshot, ...this.list],
+            data,
             errorId: this.errorId,
         }, isSong)
         this.list = [];

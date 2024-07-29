@@ -115,7 +115,7 @@ class Logger {
             } catch (e) {
                 return String(e);
             }
-        }).join();
+        });
 
         if (this.db) {
             try {
@@ -139,7 +139,7 @@ class Logger {
                 }
                 this.logMap.set(md5, getTimestamp());
                 const count = await this.db.addData(data);
-                if (count > 10 && !this.isReport) {
+                if (count > 100 && !this.isReport) {
                     this.isReport = true;
                     const result = await this.db.getAllData();
                     this.isReport = false;

@@ -34,8 +34,8 @@ export default {
         json(),
         terser({
             compress: {
-                drop_console: true,
-                drop_debugger: true,
+                drop_console: process.env.NODE_ENV === 'production',
+                drop_debugger: process.env.NODE_ENV === 'production',
             }
         }),
         livereload({
