@@ -7,7 +7,8 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "rollup -c",
-    "dev": "rollup -c -w"
+    "dev": "rollup -c -w",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
   },
   "keywords": [],
   "author": "",
@@ -25,7 +26,8 @@
     "rollup": "^4.18.0",
     "rollup-plugin-livereload": "^2.0.5",
     "tslib": "^2.6.3",
-    "typescript": "^5.5.2"
+    "typescript": "^5.5.2",
+    "prettier": "^3.0.0"
   },
   "dependencies": {
     "@types/pako": "^2.0.3",

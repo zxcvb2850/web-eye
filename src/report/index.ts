@@ -1,13 +1,30 @@
-import { _global, _support, jsonToString, zip, isString, isNumber, on, stringToJSON, isJsonString } from '../utils';
-import { Callback, IAnyObject, ReportCustomDataFace, ReportSystemDataFace, ReportTypeEnum, ReportEventEnum, ReportNetEnum } from '../types'
+import {
+  _global,
+  _support,
+  jsonToString,
+  zip,
+  isString,
+  isNumber,
+  on,
+  stringToJSON,
+  isJsonString,
+} from '../utils';
+import {
+  Callback,
+  IAnyObject,
+  ReportCustomDataFace,
+  ReportSystemDataFace,
+  ReportTypeEnum,
+  ReportEventEnum,
+  ReportNetEnum,
+} from '../types';
 import logger from '../logger';
 
 class ReportLogs {
   private _cache: ReportSystemDataFace[] = []; // 缓存需要上报的内容
   private _isCheckBeacon: boolean = true; // 是否检测 是否支持 beacon
   private _isBeacon: boolean = true; // 是否支持 beacon
-  constructor() {
-  }
+  constructor() {}
 
   /**
    * 系统上报
@@ -16,37 +33,56 @@ class ReportLogs {
    * */
   sendSystem(data: ReportSystemDataFace, isSong = false) {
     data.type = ReportTypeEnum.SYSTEM;
-    if (data.event === ReportEventEnum.PERFORMANCE || data.event === ReportEventEnum.HASHCHANGE || data.event === ReportEventEnum.HISTORY || data.event === ReportEventEnum.RESOURCES) {
+    if (
+      data.event === ReportEventEnum.PERFORMANCE ||
+      data.event === ReportEventEnum.HASHCHANGE ||
+      data.event === ReportEventEnum.HISTORY ||
+      data.event === ReportEventEnum.RESOURCES
+    ) {
       if (_support.options.debug) {
-        this.requestIdleCallback(()=> this.reportSendBeacon(data), isSong);
+        this.requestIdleCallback(() => this.reportSendBeacon(data), isSong);
       } else {
-        this.requestIdleCallback(()=> this.reportSendBeaconBuffer(data), isSong);
+        this.requestIdleCallback(
+          () => this.reportSendBeaconBuffer(data),
+          isSong,
+        );
       }
-    }
-    else if (data.event === ReportEventEnum.CLICK || data.event === ReportEventEnum.ACTION_RECORD || data.event === ReportEventEnum.CONSOLE){
+    } else if (
+      data.event === ReportEventEnum.CLICK ||
+      data.event === ReportEventEnum.ACTION_RECORD ||
+      data.event === ReportEventEnum.CONSOLE
+    ) {
       this.requestIdleCallback(() => this.reportSendBeaconBuffer(data), isSong);
-    }
-    else {
+    } else {
       if (_support.options.debug) {
         this.requestIdleCallback(() => this.reportSendFetch(data), isSong);
       } else {
-        this.requestIdleCallback(() => this.reportSendFetchBuffer(data), isSong);
+        this.requestIdleCallback(
+          () => this.reportSendFetchBuffer(data),
+          isSong,
+        );
       }
-    }      
+    }
   }
 
   // 自定义日志上报
-  sendCustom(event: ReportEventEnum | string | number, data: ReportCustomDataFace, reportType: ReportNetEnum = ReportNetEnum.FETCH) {
+  sendCustom(
+    event: ReportEventEnum | string | number,
+    data: ReportCustomDataFace,
+    reportType: ReportNetEnum = ReportNetEnum.FETCH,
+  ) {
     if (!event || !(isString(event) || isNumber(event))) {
       logger.warn(`custom report event typeof is string or number`);
       return;
     }
 
-    this.requestIdleCallback(() => this.reportSendFetch({
-      type: ReportTypeEnum.CUSTOM,
-      data,
-      event,
-    }));
+    this.requestIdleCallback(() =>
+      this.reportSendFetch({
+        type: ReportTypeEnum.CUSTOM,
+        data,
+        event,
+      }),
+    );
   }
 
   // 利用空闲时间上报
@@ -65,10 +101,15 @@ class ReportLogs {
       appId: _support.options.appid,
       body: jsonToString(data.data),
       sdkVersion: _support.version,
-    }
+    };
     if (data.event) reportParams.event = data.event;
     // 这两个事件无需上传额外参数
-    if (!(data.event === ReportEventEnum.CLICK || data.event === ReportEventEnum.ACTION_RECORD)) {
+    if (
+      !(
+        data.event === ReportEventEnum.CLICK ||
+        data.event === ReportEventEnum.ACTION_RECORD
+      )
+    ) {
       reportParams.visitorId = _support.visitorId;
       reportParams.uuid = _support.uuid;
       reportParams.params = this.getParamsString(_support.params);
@@ -96,9 +137,9 @@ class ReportLogs {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ data: this.sendReportParams(data) }),
-        }).catch(err => {
+        }).catch((err) => {
           logger.warn('---fetch 上报失败---', err);
-        })
+        });
       } else {
         this.reportSendXhr(data);
       }
@@ -137,7 +178,10 @@ class ReportLogs {
   private reportSendBeacon(data: ReportSystemDataFace) {
     try {
       if (!!navigator?.sendBeacon && this._isBeacon) {
-        const beaconSent = navigator.sendBeacon(`${_support.options.dsn}/beacon`, JSON.stringify({data: this.sendReportParams(data)}));
+        const beaconSent = navigator.sendBeacon(
+          `${_support.options.dsn}/beacon`,
+          JSON.stringify({ data: this.sendReportParams(data) }),
+        );
         if (!beaconSent) {
           this._isBeacon = false;
           this.reportSendFetch(data);
@@ -146,8 +190,8 @@ class ReportLogs {
           if (this._isCheckBeacon) {
             this._isCheckBeacon = false;
             setTimeout(() => {
-              this.reportSendFetchBuffer(data, "/check-beacon");
-            }, 300)
+              this.reportSendFetchBuffer(data, '/check-beacon');
+            }, 300);
           }
         }
       } else {
@@ -162,9 +206,14 @@ class ReportLogs {
   private reportSendBeaconBuffer(data: ReportSystemDataFace) {
     try {
       if (!!navigator?.sendBeacon && this._isBeacon) {
-        const compressedData = zip({data: this.sendReportParams(data)});
-        const blob = new Blob([compressedData], { type: 'application/octet-stream' });
-        const beaconSent = navigator.sendBeacon(`${_support.options.dsn}/beacon-buffer`, blob);
+        const compressedData = zip({ data: this.sendReportParams(data) });
+        const blob = new Blob([compressedData], {
+          type: 'application/octet-stream',
+        });
+        const beaconSent = navigator.sendBeacon(
+          `${_support.options.dsn}/beacon-buffer`,
+          blob,
+        );
         if (!beaconSent) {
           this._isBeacon = false;
           this.reportSendFetchBuffer(data);
@@ -173,8 +222,8 @@ class ReportLogs {
           if (this._isCheckBeacon) {
             this._isCheckBeacon = false;
             setTimeout(() => {
-              this.reportSendFetchBuffer(data, "/check-beacon");
-            }, 300)
+              this.reportSendFetchBuffer(data, '/check-beacon');
+            }, 300);
           }
         }
       } else {
@@ -186,46 +235,60 @@ class ReportLogs {
   }
 
   // fetch 压缩数据方式上报
-  private reportSendFetchBuffer(data: ReportSystemDataFace, suffix = '/pako-buffer') {
+  private reportSendFetchBuffer(
+    data: ReportSystemDataFace,
+    suffix = '/pako-buffer',
+  ) {
     if (!_global.hasOwnProperty('fetch')) {
-      const compressedData = zip({data: this.sendReportParams(data)});
+      const compressedData = zip({ data: this.sendReportParams(data) });
       fetch(`${_support.options.dsn}${suffix}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/octet-stream',
         },
         body: compressedData,
-      }).then(async res => {
-        if (suffix === '/check-beacon') {
-          // 检测 beacon 上报是否成功
-          const json = await res.json();
-          this._isBeacon = !!json?.data;
-          logger.log('---fetch buffer check---', suffix, json);
-        }
-      }).catch((err) => {
-        logger.warn('---fetch buffer 上报失败---', err);
       })
+        .then(async (res) => {
+          if (suffix === '/check-beacon') {
+            // 检测 beacon 上报是否成功
+            const json = await res.json();
+            this._isBeacon = !!json?.data;
+            logger.log('---fetch buffer check---', suffix, json);
+          }
+        })
+        .catch((err) => {
+          logger.warn('---fetch buffer 上报失败---', err);
+        });
     } else {
       this.reportSendXhrBuffer(data, suffix);
     }
   }
 
   // xhr 压缩数据方式上报
-  private reportSendXhrBuffer(data: ReportSystemDataFace, suffix='/pako-buffer') {
+  private reportSendXhrBuffer(
+    data: ReportSystemDataFace,
+    suffix = '/pako-buffer',
+  ) {
     try {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${_support.options.dsn}${suffix}`, true);
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
-      const compressedData = zip({data: this.sendReportParams(data)});
+      const compressedData = zip({ data: this.sendReportParams(data) });
       xhr.send(compressedData);
 
       on(xhr, 'loadend', () => {
-        if (suffix === '/check-beacon' && xhr.status >= 200 && xhr.status < 300) {
-          let json = isJsonString(xhr.responseText) ? stringToJSON(xhr.responseText) : null;
-          this._isBeacon = !!json?.data
+        if (
+          suffix === '/check-beacon' &&
+          xhr.status >= 200 &&
+          xhr.status < 300
+        ) {
+          let json = isJsonString(xhr.responseText)
+            ? stringToJSON(xhr.responseText)
+            : null;
+          this._isBeacon = !!json?.data;
           logger.log('---xhr buffer check---', suffix, json);
         }
-      })
+      });
     } catch (err) {
       logger.warn('---xhr 上报失败---', err);
     }
@@ -235,6 +298,6 @@ class ReportLogs {
 const instance = new ReportLogs();
 const reportLogs = (data: ReportSystemDataFace, isSong?: boolean) => {
   instance.sendSystem(data, isSong);
-}
+};
 reportLogs.sendCustom = instance.sendCustom.bind(instance);
 export default reportLogs;

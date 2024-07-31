@@ -1,4 +1,11 @@
-import { _global, getCacheData, localStorageRouter, on, replaceOriginal, setCacheData } from '../utils';
+import {
+  _global,
+  getCacheData,
+  localStorageRouter,
+  on,
+  replaceOriginal,
+  setCacheData,
+} from '../utils';
 import { ReportEventEnum } from '../types';
 import reportLogs from '../report';
 
@@ -16,8 +23,8 @@ export default class HistoryRouter {
       reportLogs({
         event: ReportEventEnum.HASHCHANGE,
         data: { old: oldURL, new: newURL, type: 'hashchange' },
-      })
-    })
+      });
+    });
   }
 
   proxyHistory() {
@@ -31,10 +38,10 @@ export default class HistoryRouter {
         reportLogs({
           event: ReportEventEnum.HISTORY,
           data: { old: href, new: newPath, type: 'pushState' },
-        })
+        });
         originalPushState.apply(this, args);
-      }
-    })
+      };
+    });
     replaceOriginal(originalHistory, 'replaceState', (originalReplaceState) => {
       return function (this: History, ...args: any[]) {
         const { href } = _global.location;
@@ -44,9 +51,9 @@ export default class HistoryRouter {
         reportLogs({
           event: ReportEventEnum.HISTORY,
           data: { old: oldPath, new: href, type: 'replaceState' },
-        })
+        });
         originalReplaceState.apply(this, args);
-      }
-    })
+      };
+    });
   }
 }
