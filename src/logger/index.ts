@@ -152,6 +152,7 @@ class Logger {
           await this.db.clearData();
         }
       } catch (err) {
+        console.info('-----------------', err);
         this.warn(`save console indexDB err: `, err);
       }
     }

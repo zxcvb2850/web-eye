@@ -16,7 +16,6 @@ import {
   ReportSystemDataFace,
   ReportTypeEnum,
   ReportEventEnum,
-  ReportNetEnum,
 } from '../types';
 import logger from '../logger';
 
@@ -67,22 +66,35 @@ class ReportLogs {
 
   // 自定义日志上报
   sendCustom(
-    event: ReportEventEnum | string | number,
+    event: string | number,
     data: ReportCustomDataFace,
-    reportType: ReportNetEnum = ReportNetEnum.FETCH,
+    relateId: string,
   ) {
     if (!event || !(isString(event) || isNumber(event))) {
       logger.warn(`custom report event typeof is string or number`);
       return;
     }
+    let isKeyWord = false; // 是否是关键字
+    for (let e in ReportEventEnum) {
+      if (isString(event) && event.toUpperCase() === e) {
+        isKeyWord = true;
+        break;
+      }
+    }
+    if (isKeyWord) {
+      logger.warn(`custom report event is key word`);
+      return;
+    }
 
-    this.requestIdleCallback(() =>
-      this.reportSendFetch({
+    this.requestIdleCallback(() => {
+      const reportData: ReportSystemDataFace = {
         type: ReportTypeEnum.CUSTOM,
         data,
         event,
-      }),
-    );
+      };
+      if (relateId) reportData.relateId = relateId;
+      return this.reportSendFetch(reportData);
+    });
   }
 
   // 利用空闲时间上报
@@ -100,6 +112,8 @@ class ReportLogs {
       type: data.type,
       appId: _support.options.appid,
       body: jsonToString(data.data),
+      visitorId: _support.visitorId,
+      uuid: _support.uuid,
       sdkVersion: _support.version,
     };
     if (data.event) reportParams.event = data.event;
@@ -110,14 +124,12 @@ class ReportLogs {
         data.event === ReportEventEnum.ACTION_RECORD
       )
     ) {
-      reportParams.visitorId = _support.visitorId;
-      reportParams.uuid = _support.uuid;
       reportParams.params = this.getParamsString(_support.params);
       reportParams.device = this.getParamsString(_support.devices);
       reportParams.path = _global.location.href;
     }
 
-    data?.errorId && (reportParams['errorId'] = data.errorId);
+    data?.relateId && (reportParams['relateId'] = data.relateId);
 
     return this.getParamsString(reportParams);
   }
@@ -253,7 +265,6 @@ class ReportLogs {
             // 检测 beacon 上报是否成功
             const json = await res.json();
             this._isBeacon = !!json?.data;
-            logger.log('---fetch buffer check---', suffix, json);
           }
         })
         .catch((err) => {

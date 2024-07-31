@@ -219,8 +219,8 @@ export default class HttpProxy {
         }
         const hKey: string = formatHeadersKey(args[0]);
         if (_support.options.filterHttpHeadersWhite?.length) {
-          // @ts-ignore
           !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) &&
+            // @ts-ignore
             (this._web_eye_sdk_xhr.headers[hKey] = args[1]);
         } else {
           // @ts-ignore

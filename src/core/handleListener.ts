@@ -110,12 +110,16 @@ export default class HandleListener {
     const id = getMd5(`${message}${filename}${lineno}${colno}`);
 
     const errorId = getUuid();
-    const isReport = this.reportRecordData(id, ReportEventEnum.CODE, {
-      msg: message,
-      frames: JSON.stringify(stacks),
-      status: event?.error?.name || UnKnown,
+    const isReport = this.reportRecordData(
+      id,
+      ReportEventEnum.CODE,
+      {
+        msg: message,
+        frames: JSON.stringify(stacks),
+        status: event?.error?.name || UnKnown,
+      },
       errorId,
-    });
+    );
 
     if (isReport) {
       // 发送事件
@@ -132,11 +136,15 @@ export default class HandleListener {
       );
       const errorId = getUuid();
 
-      const isReport = this.reportRecordData(id, ReportEventEnum.REACT, {
-        msg: error.message,
-        frames: JSON.stringify(stacks),
+      const isReport = this.reportRecordData(
+        id,
+        ReportEventEnum.REACT,
+        {
+          msg: error.message,
+          frames: JSON.stringify(stacks),
+        },
         errorId,
-      });
+      );
 
       if (isReport) {
         // 发送事件
@@ -150,6 +158,7 @@ export default class HandleListener {
     id: string,
     event: ReportEventEnum,
     data: any,
+    relateId?: string,
   ): boolean {
     const oldTime = this.cacheMap.get(id);
     const now = getTimestamp();
@@ -161,7 +170,7 @@ export default class HandleListener {
     }
 
     if (isReport) {
-      reportLogs({ event, data });
+      reportLogs({ event, data, relateId });
     }
 
     return isReport;

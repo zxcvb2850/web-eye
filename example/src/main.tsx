@@ -23,10 +23,6 @@ document.body.appendChild(script);
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
         <HashRouter>
-            <h2 onClick={() => {
-                webEyeSDK.setOptions("logLevel", 4);
-                webEyeSDK.setOptions("isActionRecord", false);
-            }}>=====</h2>
             <App/>
         </HashRouter>
     </ErrorBoundary>

@@ -10,6 +10,7 @@ import {
 } from '../utils';
 import { ReportEventEnum } from '../types';
 import reportLogs from '../report';
+import logger from '../logger';
 
 interface ClickFace {
   id: string | null;
@@ -24,7 +25,7 @@ interface ClickFace {
 
 export default class OtherListener {
   private clicks: ClickFace[] = [];
-  private errorId: string = '';
+  private relateId: string = ''; // 关联的错误id
 
   constructor() {
     this.listener();
@@ -37,16 +38,22 @@ export default class OtherListener {
   listener() {
     // 代码报错后，6s 后上报行为数据
     _support.events.on(ReportEventEnum.CODE, (errorId: string) => {
-      this.errorId = errorId;
+      this.relateId = errorId;
       _support._click_delay_timer = setTimeout(() => {
         this.reportClickData();
       }, 5000);
     });
 
     // 自定义触发上报行为数据
-    _support.events.on('SEDN_REPORT_CLICK_RECORD', (id: string) => {
-      this.errorId = id;
-      this.reportClickData(true);
+    _support.events.on('SEDN_REPORT_CLICK', (id: string) => {
+      console.info('---relateId---', id);
+      if (this.relateId) {
+        this.reportClickData(true);
+      }
+      _support._click_delay_timer = setTimeout(() => {
+        this.relateId = id;
+        this.reportClickData(true);
+      }, 500);
     });
 
     // 页面被关闭，则立即上报
@@ -59,16 +66,20 @@ export default class OtherListener {
     clearTimeout(_support._click_delay_timer);
     _support._click_delay_timer = null;
 
-    reportLogs(
-      {
-        event: ReportEventEnum.CLICK,
-        data: this.clicks,
-        errorId: this.errorId,
-      },
-      isSong,
-    );
+    if (this.clicks.length) {
+      reportLogs(
+        {
+          event: ReportEventEnum.CLICK,
+          data: this.clicks,
+          relateId: this.relateId,
+        },
+        isSong,
+      );
 
-    this.clicks = [];
+      this.clicks = [];
+    } else {
+      logger.log('行为数据为空，没有需要上报的数据。');
+    }
   }
 
   // 浏览器关闭/刷新前触发的回调

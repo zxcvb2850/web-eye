@@ -132,7 +132,7 @@ export interface ReportSystemDataFace {
 
   data: IAnyObject | string;
 
-  errorId?: string;
+  relateId?: string; // 关联上报 ID
 }
 
 /**

@@ -2,13 +2,14 @@ import { record, EventType } from 'rrweb';
 import { _support } from '../utils';
 import { LOG_LEVEL_ENUM, ReportEventEnum } from '../types';
 import reportLogs from '../report';
+import logger from '../logger';
 
 export default class ActionRecord {
   private curRecord: ReturnType<typeof record>;
   private list: any[] = [];
   private metaSnapshot: any = null;
   private fullSnapshot: any = null;
-  private errorId: string = ''; // 代码错误ID
+  private relateId: string = ''; // 用于上报行为数据的关联id
 
   constructor() {
     this.startRecord();
@@ -20,16 +21,21 @@ export default class ActionRecord {
   listener() {
     // 代码报错后，6s 后上报行为数据
     _support.events.on(ReportEventEnum.CODE, (errorId: string) => {
-      this.errorId = errorId;
+      this.relateId = errorId;
       _support._record_delay_timer = setTimeout(() => {
         this.reportRecordData();
       }, 5000);
     });
 
     // 自定义触发上报行为数据
-    _support.events.on('SEDN_REPORT_CLICK_RECORD', (id: string) => {
-      this.errorId = id;
-      this.reportRecordData(true);
+    _support.events.on('SEDN_REPORT_ACTION', (id: string) => {
+      if (this.relateId) {
+        this.reportRecordData(true);
+      }
+      _support._record_delay_timer = setTimeout(() => {
+        this.relateId = id;
+        this.reportRecordData(true);
+      }, 500);
     });
 
     // 立即上报，避免用户关闭浏览器，导致行为未上报
@@ -84,17 +90,21 @@ export default class ActionRecord {
     clearTimeout(_support._record_delay_timer);
     _support._record_delay_timer = null;
 
-    const data = [this.metaSnapshot, this.fullSnapshot, ...this.list];
+    if (this.list.length) {
+      const data = [this.metaSnapshot, this.fullSnapshot, ...this.list];
 
-    reportLogs(
-      {
-        event: ReportEventEnum.ACTION_RECORD,
-        data,
-        errorId: this.errorId,
-      },
-      isSong,
-    );
-    this.list = [];
-    this.errorId = '';
+      reportLogs(
+        {
+          event: ReportEventEnum.ACTION_RECORD,
+          data,
+          relateId: this.relateId,
+        },
+        isSong,
+      );
+      this.list = [];
+      this.relateId = '';
+    } else {
+      logger.log('行为数据为空，没有需要上报的数据。');
+    }
   }
 }

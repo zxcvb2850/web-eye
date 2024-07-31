@@ -76,30 +76,9 @@ function App() {
         navigate("/404", {replace: false});
     }
 
-    // 开始录制
-    const clickRecord = async () => {}
-    // 播放回放
-    const clickPlayback = () => {
-        webEyeSDK.setOptions("isActionRecord", false);
-        setTimeout(() => {
-            const record = window.localStorage.getItem("test-record");
-            if (record) {
-                const events = JSON.parse(record);
-                if (events?.length){
-                    new rrwebPlayer({
-                        target: ref.current!,
-                        props: {
-                            events,
-                            skipInactive: true,
-                            loadTimeout: 1000,
-                            UNSAFE_replayCanvas: true,
-                        },
-                    })
-                } else {
-                    console.warn("*************************");
-                }
-            }
-        }, 200);
+    // 自定义上报
+    const clickCustomSend = () => {
+        webEyeSDK.sendCustom('xhrx', 'xxxxxxxxxxxxxxxxxxxxx', { related: 'all' });
     }
 
     return (
@@ -109,8 +88,7 @@ function App() {
             <button onClick={clickCodeError}>代码报错</button>
             <button onClick={clickButton}>点击按钮</button>
             <button onClick={clickChangeRouter}>路由跳转</button>
-            <button onClick={clickRecord}>开始录制</button>
-            <button onClick={clickPlayback}>播放回放</button>
+            <button onClick={clickCustomSend}>自定义上报</button>
             <input type="text"/>
             <input type="password"/>
             <div ref={ref}/>

@@ -27,6 +27,8 @@ import ActionRecord from './core/actionRecord';
 import OtherListener from './core/otherListener';
 import reportLogs from './report';
 
+type CustomSendRealtedType = 'all' | 'click' | 'action';
+
 /**
  * 入口文件
  * */
@@ -227,14 +229,38 @@ class webEyeSDK {
     _support.params[key] = value;
   }
 
-  sendCustom(event: string | number, data: ReportCustomDataFace) {
-    reportLogs.sendCustom(event, data);
+  /**
+   * 自定义类型上报
+   * @param event 上报类型
+   * @param data 上报内容
+   * @param options 上报配置
+   */
+  sendCustom(
+    event: string | number,
+    data: ReportCustomDataFace,
+    options: { related?: CustomSendRealtedType } = {},
+  ) {
+    const relateId = getUuid();
+    reportLogs.sendCustom(event, data, relateId);
+    if (options?.related) {
+      this.sendCustomRecord(relateId, options.related);
+    }
   }
 
   // 自定义执行行为上报 - 点击事件，屏幕录制，方便线上调试
-  sendCustomRecord(id: string) {
+  sendCustomRecord(
+    id: string | null = null,
+    type: CustomSendRealtedType = 'all',
+  ) {
     if (!id) id = getUuid();
-    _support.events.emit('SEDN_REPORT_CLICK_RECORD', id);
+    if (type === 'all') {
+      _support.events.emit('SEDN_REPORT_CLICK', id);
+      _support.events.emit('SEDN_REPORT_ACTION', id);
+    } else if (type === 'action') {
+      _support.events.emit('SEDN_REPORT_ACTION', id);
+    } else if (type === 'click') {
+      _support.events.emit('SEDN_REPORT_CLICK', id);
+    }
   }
 
   /**
