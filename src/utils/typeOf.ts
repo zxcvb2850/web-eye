@@ -71,3 +71,13 @@ export const isType = (value: any, type: string): boolean => {
 export const typeOf = (value: any): string => {
   return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
 };
+
+// 空对象
+export const isEmptyObj = (value: any) => {
+  if (isObject(value)) {
+    for (const key in value) {
+      return true;
+    }
+  }
+  return false;
+}

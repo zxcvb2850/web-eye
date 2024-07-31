@@ -7,6 +7,7 @@ import {
   debounce,
   docScreenW,
   docScreenH,
+  isEmptyObj,
 } from '../utils';
 import { ReportEventEnum } from '../types';
 import reportLogs from '../report';
@@ -25,7 +26,7 @@ interface ClickFace {
 
 export default class OtherListener {
   private clicks: ClickFace[] = [];
-  private relateId: string = ''; // 关联的错误id
+  private relateId: Set<string> = new Set(); // 关联的错误id
 
   constructor() {
     this.listener();
@@ -38,47 +39,47 @@ export default class OtherListener {
   listener() {
     // 代码报错后，6s 后上报行为数据
     _support.events.on(ReportEventEnum.CODE, (errorId: string) => {
-      this.relateId = errorId;
-      _support._click_delay_timer = setTimeout(() => {
-        this.reportClickData();
+      this.relateId.add(errorId);
+      if (!_support._click_delay_timer) _support._click_delay_timer = {};
+      _support._click_delay_timer[errorId] = setTimeout(() => {
+        this.reportClickData(errorId);
       }, 5000);
     });
 
     // 自定义触发上报行为数据
     _support.events.on('SEDN_REPORT_CLICK', (id: string) => {
-      console.info('---relateId---', id);
-      if (this.relateId) {
-        this.reportClickData(true);
-      }
-      _support._click_delay_timer = setTimeout(() => {
-        this.relateId = id;
-        this.reportClickData(true);
-      }, 500);
+      this.relateId.add(id);
+      this.reportClickData(id, true);
     });
 
     // 页面被关闭，则立即上报
     _support.events.on('report_click_song', () => {
-      this.reportClickData(true);
+      this.relateId.forEach(relateId => {
+        this.reportClickData(relateId, true);
+      })
     });
   }
 
-  reportClickData(isSong = false) {
-    clearTimeout(_support._click_delay_timer);
-    _support._click_delay_timer = null;
+  reportClickData(relateId: string, isSong = false) {
+    clearTimeout(_support._click_delay_timer[relateId]);
+    delete _support._click_delay_timer[relateId];
 
     if (this.clicks.length) {
       reportLogs(
         {
           event: ReportEventEnum.CLICK,
           data: this.clicks,
-          relateId: this.relateId,
+          relateId,
         },
         isSong,
       );
-
-      this.clicks = [];
     } else {
       logger.log('行为数据为空，没有需要上报的数据。');
+    }
+
+    this.relateId.delete(relateId);
+    if (!this.relateId.size) {
+      this.clicks = [];
     }
   }
 
@@ -86,10 +87,10 @@ export default class OtherListener {
   beforeUnLoad() {
     on(_global, 'beforeunload', (event: Event) => {
       // 关闭前如果有延迟上报的，则执行立即上报
-      if (_support._record_delay_timer) {
+      if (_support._record_delay_timer && isEmptyObj(_support._record_delay_timer)) {
         _support.events.emit('report_record_song');
       }
-      if (_support._click_delay_timer) {
+      if (_support._click_delay_timer && isEmptyObj(_support._click_delay_timer)) {
         _support.events.emit('report_click_song');
       }
     });
