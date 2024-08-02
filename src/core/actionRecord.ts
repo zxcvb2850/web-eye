@@ -30,15 +30,15 @@ export default class ActionRecord {
 
     // 自定义触发上报行为数据
     _support.events.on('SEDN_REPORT_ACTION', (id: string) => {
-        this.relateId.add(id);
-        this.reportRecordData(id, true);
+      this.relateId.add(id);
+      this.reportRecordData(id, true);
     });
 
     // 立即上报，避免用户关闭浏览器，导致行为未上报
     _support.events.on('report_record_song', () => {
-      this.relateId.forEach(val => {
+      this.relateId.forEach((val) => {
         this.reportRecordData(val, true);
-      })
+      });
     });
   }
 
@@ -79,10 +79,13 @@ export default class ActionRecord {
     this.curRecord && this.curRecord();
 
     // 开发环境，停止录制就上报
-    if (_support.options.logLevel === LOG_LEVEL_ENUM.DEBUG && this.relateId.size) {
-      this.relateId.forEach(val => {
+    if (
+      _support.options.logLevel === LOG_LEVEL_ENUM.DEBUG &&
+      this.relateId.size
+    ) {
+      this.relateId.forEach((val) => {
         this.reportRecordData(val);
-      })
+      });
     }
   }
 
@@ -106,7 +109,7 @@ export default class ActionRecord {
     }
 
     this.relateId.delete(relateId);
-    if (this.relateId.size ===  0) {
+    if (this.relateId.size === 0) {
       this.list = [];
     }
   }

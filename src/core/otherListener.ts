@@ -54,9 +54,9 @@ export default class OtherListener {
 
     // 页面被关闭，则立即上报
     _support.events.on('report_click_song', () => {
-      this.relateId.forEach(relateId => {
+      this.relateId.forEach((relateId) => {
         this.reportClickData(relateId, true);
-      })
+      });
     });
   }
 
@@ -87,10 +87,16 @@ export default class OtherListener {
   beforeUnLoad() {
     on(_global, 'beforeunload', (event: Event) => {
       // 关闭前如果有延迟上报的，则执行立即上报
-      if (_support._record_delay_timer && isEmptyObj(_support._record_delay_timer)) {
+      if (
+        _support._record_delay_timer &&
+        isEmptyObj(_support._record_delay_timer)
+      ) {
         _support.events.emit('report_record_song');
       }
-      if (_support._click_delay_timer && isEmptyObj(_support._click_delay_timer)) {
+      if (
+        _support._click_delay_timer &&
+        isEmptyObj(_support._click_delay_timer)
+      ) {
         _support.events.emit('report_click_song');
       }
     });

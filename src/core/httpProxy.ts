@@ -66,68 +66,66 @@ export default class HttpProxy {
         }
 
         const domain = getDomainUrl(requestUrl);
-
-        // 获取请求头信息
-        const headersObj: { [key: string]: string } = {};
-        if (headers instanceof Headers) {
-          headers.forEach((value, key) => {
-            const hKey = formatHeadersKey(key);
-            if (_support.options.filterHttpHeadersWhite?.length) {
-              !filterWhiteList(_support.options.filterHttpHeadersWhite, key) &&
-                (headersObj[hKey] = value);
-            } else {
-              headersObj[hKey] = value;
-            }
-          });
-        } else if (headers) {
-          for (const key in headers) {
-            if (headers.hasOwnProperty(key)) {
+        const originPathName = `${domain.origin}${domain.pathname}`;
+        let headersObj = null;
+        let params = null;
+        if (!that.isFilterHttpUrl(originPathName)) {
+          // 获取请求头信息
+          const headersObj: { [key: string]: string } = {};
+          if (headers instanceof Headers) {
+            headers.forEach((value, key) => {
               const hKey = formatHeadersKey(key);
               if (_support.options.filterHttpHeadersWhite?.length) {
                 !filterWhiteList(
                   _support.options.filterHttpHeadersWhite,
                   key,
-                ) && (headersObj[hKey] = headers[key]);
+                ) && (headersObj[hKey] = value);
               } else {
-                headersObj[hKey] = headers[key];
+                headersObj[hKey] = value;
+              }
+            });
+          } else if (headers) {
+            for (const key in headers) {
+              if (headers.hasOwnProperty(key)) {
+                const hKey = formatHeadersKey(key);
+                if (_support.options.filterHttpHeadersWhite?.length) {
+                  !filterWhiteList(
+                    _support.options.filterHttpHeadersWhite,
+                    key,
+                  ) && (headersObj[hKey] = headers[key]);
+                } else {
+                  headersObj[hKey] = headers[key];
+                }
+              }
+            }
+          }
+          // 获取请求参数
+          let params: any = null;
+          if (method === 'GET') {
+            params = getQueryParams(requestUrl);
+          } else if (method === 'POST' || method === 'PUT') {
+            const contentType = headersObj?.['Content-Type'] || null;
+            if (
+              contentType &&
+              contentType?.indexOf('application/x-www-form-urlencoded') > -1
+            ) {
+              params = parseUrlEncodedBody(body);
+            } else {
+              try {
+                params = JSON.parse(body);
+              } catch (e) {
+                // 不是 JSON 格式
+                params = body;
               }
             }
           }
         }
 
-        // 获取请求参数
-        let params: any = null;
-        if (method === 'GET') {
-          params = getQueryParams(requestUrl);
-        } else if (method === 'POST' || method === 'PUT') {
-          const contentType = headersObj?.['Content-Type'] || null;
-          if (
-            contentType &&
-            contentType?.indexOf('application/x-www-form-urlencoded') > -1
-          ) {
-            params = parseUrlEncodedBody(body);
-          } else {
-            try {
-              params = JSON.parse(body);
-            } catch (e) {
-              // 不是 JSON 格式
-              params = body;
-            }
-          }
-        }
-
-        const originPathName = `${domain.origin}${domain.pathname}`;
-
         return originalFetch.apply(_global, [input, config]).then(
           (res: Response) => {
-            // console.log("===fetch res type===", res.type);
-            // console.log("===fetch res status===", res.status);
-            // console.log("===fetch res statustext===", res.statusText);
-            // console.log("===fetch res url===", res.url);
-            // console.log("===fetch res headers===", headers);
             const clone = res.clone();
             clone.text().then((bodyRes) => {
-              if (that.isFilterHttpUrl(requestUrl)) return;
+              if (that.isFilterHttpUrl(originPathName)) return;
 
               const endTime = getTimestamp();
               const time = endTime - startTime;
@@ -203,28 +201,36 @@ export default class HttpProxy {
       return function (this: XMLHttpRequest, ...args: any[]): void {
         // @ts-ignore
         this._web_eye_sdk_xhr = {
-          startTime: getTimestamp(),
+          isFilter: that.isFilterHttpUrl(args[1]),
           url: args[1],
-          method: args[0].toUpperCase(),
+          startTime: getTimestamp(),
         };
+        // @ts-ignore
+        if (!this._web_eye_sdk_xhr.isFilter) {
+          // @ts-ignore
+          this._web_eye_sdk_xhr.method = args[0].toUpperCase();
+        }
         originalOpen.apply(this, args);
       };
     });
     replaceOriginal(originalXHRProto, 'setRequestHeader', (originalHeader) => {
       return function (this: XMLHttpRequest, ...args: any[]): void {
         // @ts-ignore
-        if (!this._web_eye_sdk_xhr?.headers) {
+        if (!this._web_eye_sdk_xhr.isFilter) {
           // @ts-ignore
-          this._web_eye_sdk_xhr.headers = {};
-        }
-        const hKey: string = formatHeadersKey(args[0]);
-        if (_support.options.filterHttpHeadersWhite?.length) {
-          !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) &&
+          if (!this._web_eye_sdk_xhr?.headers) {
             // @ts-ignore
-            (this._web_eye_sdk_xhr.headers[hKey] = args[1]);
-        } else {
-          // @ts-ignore
-          this._web_eye_sdk_xhr.headers[hKey] = args[1];
+            this._web_eye_sdk_xhr.headers = {};
+          }
+          const hKey: string = formatHeadersKey(args[0]);
+          if (_support.options.filterHttpHeadersWhite?.length) {
+            !filterWhiteList(_support.options.filterHttpHeadersWhite, hKey) &&
+              // @ts-ignore
+              (this._web_eye_sdk_xhr.headers[hKey] = args[1]);
+          } else {
+            // @ts-ignore
+            this._web_eye_sdk_xhr.headers[hKey] = args[1];
+          }
         }
         originalHeader.apply(this, args);
       };
@@ -232,29 +238,37 @@ export default class HttpProxy {
     replaceOriginal(originalXHRProto, 'send', (originalSend) => {
       return function (this: XMLHttpRequest, ...args: any[]): void {
         // @ts-ignore
-        const { startTime, url, method, headers } = this._web_eye_sdk_xhr;
-        // 获取请求参数
+        const { isFilter, startTime, url, method, headers } =
+          this._web_eye_sdk_xhr;
+        let domain: URL | null = null;
         let params: any = null;
-        if (method === 'GET') {
-          params = args[0] ? parseUrlEncodedBody(args[0]) : getQueryParams(url);
-        } else if (method === 'POST' || method === 'PUT') {
-          const contentType = headers?.['Content-Type'] || null;
-          if (
-            contentType &&
-            contentType?.indexOf('application/x-www-form-urlencoded') > -1
-          ) {
-            params = parseUrlEncodedBody(args[0] as string);
-          } else {
-            params = stringToJSON(args[0]);
+        if (!isFilter) {
+          // 获取请求参数
+          if (method === 'GET') {
+            params = args[0]
+              ? parseUrlEncodedBody(args[0])
+              : getQueryParams(url);
+          } else if (method === 'POST' || method === 'PUT') {
+            const contentType = headers?.['Content-Type'] || null;
+            if (
+              contentType &&
+              contentType?.indexOf('application/x-www-form-urlencoded') > -1
+            ) {
+              params = parseUrlEncodedBody(args[0] as string);
+            } else {
+              params = stringToJSON(args[0]);
+            }
           }
+          domain = getDomainUrl(url);
         }
-        const domain = getDomainUrl(url);
         on(this, 'readystatechange', () => {
           if (that.isFilterHttpUrl(url)) return;
 
           const endTime = getTimestamp();
           const time = endTime - startTime;
-          const originPathName = `${domain.origin}${domain.pathname}`;
+          const originPathName = domain
+            ? `${domain.origin}${domain.pathname}`
+            : null;
 
           if (this.readyState === 4) {
             if (this.status >= 200 && this.status < 300) {
@@ -266,7 +280,9 @@ export default class HttpProxy {
                 ? stringToJSON(this.responseText)
                 : responseType;
               if (_support.options.transformResponse) {
-                body = _support.options.transformResponse(originPathName, body);
+                body = originPathName
+                  ? _support.options.transformResponse(originPathName, body)
+                  : null;
                 !!body &&
                   reportLogs({
                     event: ReportEventEnum.XHR,
