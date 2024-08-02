@@ -48,7 +48,7 @@ class Logger {
     ) {
       isHide = true;
     }
-    if (isSystem && !isHide) {
+    if (!isSystem && !isHide) {
       logMethods(...args);
     }
     if (this.isCurrentLevel(level)) {
