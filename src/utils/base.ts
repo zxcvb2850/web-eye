@@ -1,5 +1,5 @@
 import md5 from 'crypto-js/md5';
-import * as pako from 'pako';
+import { gzipSync } from 'fflate';
 import { _global, isString, isRegExp } from '../utils';
 import { Callback, ErrorTypeEnum, StackFrameFace } from '../types';
 import logger from '../logger';
@@ -283,7 +283,9 @@ export function zip(data: any) {
   if (!data) return data;
   try {
     const dataJsonStr = isString(data) ? data : jsonToString(data);
-    return pako.gzip(dataJsonStr);
+    const input = new TextEncoder().encode(dataJsonStr);
+    const compressed = gzipSync(input);
+    return compressed;
   } catch (err) {
     logger.warn(err);
     return data;

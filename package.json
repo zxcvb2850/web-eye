@@ -20,19 +20,21 @@
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.6",
-    "@rollup/plugin-wasm": "^6.2.2",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^20.14.7",
+    "javascript-obfuscator": "^4.1.1",
+    "prettier": "^3.0.0",
     "rollup": "^4.18.0",
+    "rollup-plugin-javascript-obfuscator": "^1.0.4",
     "rollup-plugin-livereload": "^2.0.5",
+    "rollup-plugin-obfuscator": "^1.1.0",
+    "rollup-plugin-visualizer": "^5.12.0",
     "tslib": "^2.6.3",
-    "typescript": "^5.5.2",
-    "prettier": "^3.0.0"
+    "typescript": "^5.5.2"
   },
   "dependencies": {
-    "@types/pako": "^2.0.3",
     "crypto-js": "^4.2.0",
-    "pako": "^2.1.0",
+    "fflate": "^0.8.2",
     "rrweb": "2.0.0-alpha.4",
     "web-vitals": "^4.2.0"
   },

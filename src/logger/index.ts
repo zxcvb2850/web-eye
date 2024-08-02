@@ -48,6 +48,7 @@ class Logger {
     ) {
       isHide = true;
     }
+    console.info('isSystem', isSystem);
     if (!isSystem && !isHide) {
       logMethods(...args);
     }
@@ -55,7 +56,7 @@ class Logger {
       if (isSystem) {
         logMethods(`【${_support.name}】 `, ...args);
       }
-      this.withConsoleData(level, [`【${_support.name}】 `, ...args]);
+      this.withConsoleData(level, args);
     }
   }
 

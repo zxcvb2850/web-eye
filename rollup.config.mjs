@@ -2,9 +2,10 @@ import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import typescript from '@rollup/plugin-typescript';
 import json from '@rollup/plugin-json';
-import terser from '@rollup/plugin-terser';
-import wasm from '@rollup/plugin-wasm';
 import livereload from 'rollup-plugin-livereload';
+import { visualizer } from "rollup-plugin-visualizer";
+import terser from '@rollup/plugin-terser';
+import obfuscator from 'rollup-plugin-obfuscator';
 
 export default {
     input: 'src/index.ts',
@@ -29,7 +30,6 @@ export default {
     plugins: [
         resolve(),
         commonjs(),
-        wasm(),
         typescript({ tsconfig: './tsconfig.json' }),
         json(),
         terser({
@@ -38,8 +38,21 @@ export default {
                 drop_debugger: process.env.NODE_ENV === 'production',
             }
         }),
+        // 混淆代码
+        obfuscator({
+            // 配置选项
+            compact: true,
+            controlFlowFlattening: true,
+            controlFlowFlatteningThreshold: 0.75,
+            numbersToExpressions: true,
+            simplify: true,
+            shuffleStringArray: true,
+            splitStrings: true,
+            stringArrayThreshold: 0.75,
+        }),
         livereload({
             watch: 'dist',
         }),
+        visualizer(),
     ],
 };
