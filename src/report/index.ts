@@ -48,10 +48,11 @@ class ReportLogs {
       }
     } else if (
       data.event === ReportEventEnum.CLICK ||
-      data.event === ReportEventEnum.ACTION_RECORD ||
       data.event === ReportEventEnum.CONSOLE
     ) {
       this.requestIdleCallback(() => this.reportSendBeaconBuffer(data), isSong);
+    } else if (data.event === ReportEventEnum.ACTION_RECORD) {
+      this.requestIdleCallback(() => this.reportSendFetchBuffer(data), isSong);
     } else {
       if (_support.options.debug) {
         this.requestIdleCallback(() => this.reportSendFetch(data), isSong);

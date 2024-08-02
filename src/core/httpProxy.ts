@@ -238,7 +238,8 @@ export default class HttpProxy {
     replaceOriginal(originalXHRProto, 'send', (originalSend) => {
       return function (this: XMLHttpRequest, ...args: any[]): void {
         // @ts-ignore
-        const { isFilter, startTime, url, method, headers } = this._web_eye_sdk_xhr;
+        const { isFilter, startTime, url, method, headers } =
+          this._web_eye_sdk_xhr;
         let domain: URL | null = null;
         let params: any = null;
         if (!isFilter) {

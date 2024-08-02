@@ -1,3 +1,4 @@
+import { _global } from '../utils';
 import { EventsBusFace, IAnyObject, ErrorTypeEnum } from './base';
 
 export interface Window {
@@ -7,6 +8,7 @@ export interface Window {
   document: Document;
   addEventListener: EventListener;
   removeEventListener: EventListener;
+  console: Console;
   fetch: any;
   XMLHttpRequest: any;
   history: History;
@@ -35,7 +37,6 @@ export interface webEyeSDK {
 export interface OptionsFace {
   dsn: string;
   appid: string;
-  isConsole?: boolean;
   logLevel?: number;
   isPlayback?: boolean;
   debug?: boolean;
@@ -44,6 +45,8 @@ export interface OptionsFace {
   maxRecordLimit?: number; // 记录行为数量
   isRecordClick?: boolean; // 是否记录点击事件
   maxClickLimit?: number; // 记录点击数量
+  isConsole?: boolean; // 是否重写 console
+  consolesHide?: string[]; // 是否拦截控制台打印 console
   filterHttpUrlWhite?: (string | RegExp)[]; // 过滤需要上报的白名单
   filterHttpHeadersWhite?: (string | RegExp)[]; // 由于隐私问题，过滤请求接口中的Header白名单
   transformResponse?: null | ((url: string, res: string) => any); // 自定义请求响应上报数据

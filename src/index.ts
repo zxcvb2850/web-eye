@@ -114,6 +114,8 @@ class webEyeSDK {
     }
     validateOptions(options.isConsole, 'isConsole', 'boolean', true) &&
       (this.options.isConsole = options.isConsole);
+    validateOptions(options.consolesHide, 'consolesHide', 'array', true) &&
+      (this.options.consolesHide = options.consolesHide);
     if (
       validateOptions(options.whiteScreenDoms, 'whiteScreenDoms', 'array', true)
     ) {

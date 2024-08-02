@@ -38,45 +38,55 @@ class Logger {
   }
 
   private show(level: LOG_LEVEL_ENUM, isSystem = false, ...args: any[]) {
+    const name = LOG_LEVEL_ENUM[level].toLowerCase();
+    const logMethods = this.logMethods[level];
+    let isHide = false;
+    if (
+      _support.options?.consolesHide &&
+      _support.options?.consolesHide.length &&
+      _support.options.consolesHide.indexOf(name) !== -1
+    ) {
+      isHide = true;
+    }
+    if (isSystem && !isHide) {
+      logMethods(...args);
+    }
     if (this.isCurrentLevel(level)) {
-      const logMethods = this.logMethods[level];
       if (isSystem) {
-        this.withConsoleData(level, args);
+        logMethods(`【${_support.name}】 `, ...args);
       }
-      logMethods(`${isSystem ? '' : `【${_support.name}】 `}`, ...args);
+      this.withConsoleData(level, [`【${_support.name}】 `, ...args]);
     }
   }
 
   log(...args: any[]) {
-    this.show(LOG_LEVEL_ENUM.LOG, false, ...args);
+    this.show(LOG_LEVEL_ENUM.LOG, true, ...args);
   }
 
   error(...args: any[]) {
-    this.show(LOG_LEVEL_ENUM.ERROR, false, ...args);
+    this.show(LOG_LEVEL_ENUM.ERROR, true, ...args);
   }
 
   warn(...args: any[]) {
-    this.show(LOG_LEVEL_ENUM.WARN, false, ...args);
+    this.show(LOG_LEVEL_ENUM.WARN, true, ...args);
   }
 
   debug(...args: any[]) {
-    this.show(LOG_LEVEL_ENUM.DEBUG, false, ...args);
+    this.show(LOG_LEVEL_ENUM.DEBUG, true, ...args);
   }
 
   // 重写 console，用于获取 console 内容
   private hookConsoleMethods() {
     if (_support.options.isConsole) {
       const _this = this;
-      const sysConsoles: { [key: string]: Function } = {
-        [LOG_LEVEL_ENUM.DEBUG]: console.debug,
-        [LOG_LEVEL_ENUM.LOG]: console.log,
-        [LOG_LEVEL_ENUM.WARN]: console.warn,
-        [LOG_LEVEL_ENUM.ERROR]: console.error,
-      };
-      for (const key in sysConsoles) {
-        replaceOriginal(console, sysConsoles[key].name, (originalConsole) => {
+      const consoles = Object.keys(LOG_LEVEL_ENUM).filter((key) =>
+        isNaN(Number(key)),
+      ) as Array<keyof typeof LOG_LEVEL_ENUM>;
+      for (const key of consoles) {
+        const keyLower = key.toLocaleLowerCase();
+        replaceOriginal(console, keyLower, (originalConsole) => {
           return function (this: Console, ...args: any[]) {
-            _this.show(parseInt(key), true, ...args);
+            _this.show(LOG_LEVEL_ENUM[key], false, ...args);
           };
         });
       }
