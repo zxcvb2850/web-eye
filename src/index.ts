@@ -242,9 +242,10 @@ class webEyeSDK {
     data: ReportCustomDataFace,
     options: { related?: CustomSendRealtedType } = {},
   ) {
-    const relateId = getUuid();
+    let relateId = null;
+    if (options?.related) relateId = getUuid();
     reportLogs.sendCustom(event, data, relateId);
-    if (options?.related) {
+    if (relateId) {
       this.sendCustomRecord(relateId, options.related);
     }
   }

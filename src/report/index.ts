@@ -69,7 +69,7 @@ class ReportLogs {
   sendCustom(
     event: string | number,
     data: ReportCustomDataFace,
-    relateId: string,
+    relateId: string | null,
   ) {
     if (!event || !(isString(event) || isNumber(event))) {
       logger.warn(`custom report event typeof is string or number`);
