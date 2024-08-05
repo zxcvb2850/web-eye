@@ -331,6 +331,19 @@ export default class HttpProxy {
               });
             } else {
               logger.log('xhr status', this.status);
+              reportLogs({
+                event: ReportEventEnum.XHR,
+                data: {
+                  network: NetworkErrorEnum.ERROR,
+                  status: this.status,
+                  url: originPathName,
+                  method,
+                  headers,
+                  params,
+                  time,
+                  isCross: that.isCrossOriginXhrError(this),
+                },
+              });
             }
           }
         });
