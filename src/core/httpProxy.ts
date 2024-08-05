@@ -314,7 +314,7 @@ export default class HttpProxy {
                 }
               }
             } else if (this.status === 0) {
-              that.isXhrError = true;
+              that.isXhrError = true; // 防止错误类型重复上报
 
               reportLogs({
                 event: ReportEventEnum.XHR,
