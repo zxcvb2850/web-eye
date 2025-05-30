@@ -1,0 +1,39 @@
+{
+  "name": "web-eye-logs",
+  "version": "0.0.2",
+  "description": "WEB logs monitoring",
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "unpkg": "dist/index.global.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development tsup --watch",
+    "build:dev": "cross-env NODE_ENV=development tsup",
+    "build": "tsup",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+  },
+  "keywords": [
+    "web",
+    "monitoring",
+    "logs",
+    "report",
+    "behaviour"
+  ],
+  "author": "king",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^22.15.24",
+    "cross-env": "^7.0.3",
+    "prettier": "^3.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^4.4.1",
+    "crypto-js": "^4.2.0",
+    "fflate": "^0.8.2",
+    "rrweb": "2.0.0-alpha.4",
+    "web-vitals": "^4.2.0"
+  }
+}
