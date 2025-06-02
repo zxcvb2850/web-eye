@@ -8,15 +8,19 @@ function App() {
     const [obj] = useState({a: 1, b: {c: 2}})
 
     const handleClick = () => {
-        const obj = {a: 1, b: {c: 2}};
-        console.info("a: ", obj.a)
-        console.info("b: ", obj.b)
-        console.info("c: ", obj.b.c)
-        console.info("d: ", obj.b.d)
-        console.info("e: ", obj.b.d.e)
+        // const obj = {a: 1, b: {c: 2}};
+        // console.info("a: ", obj.a)
+        // console.info("b: ", obj.b)
+        // console.info("c: ", obj.b.c)
+        // console.info("d: ", obj.b.d)
+        // console.info("e: ", obj.b.d.e)
 
         // console.log("click react")
         // fetch("http://localhost:8080/test");
+
+        window.customReportPlugin.customReport(new Date(), {
+            includeBehavior: true,
+        })
     }
 
   return (

@@ -1,0 +1,190 @@
+import {Plugin} from "../core/Plugin";
+import {LoggerPlugin} from "./LoggerPlugin";
+import {ErrorPlugin} from "./ErrorPlugin";
+import {generateId, safeJsonStringify} from "../utils/common";
+import {MonitorType} from "../types";
+
+// 自定义上报数据接口
+interface CustomReportData {
+    id?: string;
+    content: string // 上报内容
+    extra?: Record<string, any>, // 附加数据
+}
+
+// 上报配置接口
+interface ReportOptions {
+    includeBehavior?: boolean; // 是否包含行为数据
+}
+
+// 自定义上报插件配置
+interface CustomReportConfig {
+    maxContentLength: number; // 上报内容最大长度
+    maxBehaviorRecords: number; // 最大行为记录数
+}
+
+/**
+ * 自定义上报数据插件
+ * */
+export class CustomReportPlugin extends Plugin {
+    name = "CustomReportPlugin";
+    private logger: any;
+    private errorPlugin: ErrorPlugin | null = null;
+    private config: CustomReportConfig = {
+        maxContentLength: 10000,        // 10KB
+        maxBehaviorRecords: 20,
+    };
+
+    constructor(config?:Partial<CustomReportConfig>) {
+        super();
+        this.config = {...this.config, ...config}
+    }
+
+
+    protected init(): void{
+        const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
+        this.logger = loggerPlugin?.getLogger() || console;
+
+        // 获取 ErrorPlugin 实例（用于获取行为数据）
+        this.errorPlugin = this.monitor.getPlugin("ErrorPlugin") as ErrorPlugin;
+
+        this.logger.log("Init CustomReportPlugin");
+    }
+
+    protected destroy(): void{
+
+    }
+
+    /**
+     * 自定义上报
+     * */
+    public customReport(data: CustomReportData, options: ReportOptions = {}): { success: boolean; reportId: string | null } {
+        try {
+            const reportId = data?.id || generateId();
+
+            const content = this.serializeContent(data);
+            const reportOtherData = this.prepareReportData(options);
+
+            this.report({
+                type: MonitorType.CUSTOM,
+                data: {
+                    reportId,
+                    payload: {...reportOtherData, content},
+                }
+            })
+
+            this.logger.log(`Custom report success ====>`, {
+                reportId,
+                payload: {...reportOtherData, content},
+            });
+
+            return {
+                success: true,
+                reportId,
+            }
+        } catch (error) {
+            this.logger.error('Custom report failed ====>', error);
+            return {
+                success: false,
+                reportId: data?.id || null,
+            }
+        }
+    }
+
+    /**
+     * 自定义上报携带其他数据
+     * */
+    private prepareReportData(options: ReportOptions): CustomReportData & { behaviors?: any[] } {
+        const reportData: any = {};
+
+        // 添加用户行为数据
+        if (options.includeBehavior && this.errorPlugin) {
+            try {
+                const behaviors = this.errorPlugin.getBehaviorQueue();
+                if (behaviors?.length) {
+                    reportData.behaviors = behaviors.slice(-this.config.maxBehaviorRecords);
+                }
+            } catch (error) {
+               this.logger.warn(`Add user behaviors failed ====>`, error);
+            }
+        }
+
+        return reportData;
+    }
+
+    /**
+     * 序列化内容
+     */
+    private serializeContent(content: any): any {
+        if (content === null || content === undefined) {
+            return content;
+        }
+
+        if (typeof content === 'string' || typeof content === 'number' || typeof content === 'boolean') {
+            return content;
+        }
+
+        if (content instanceof Error) {
+            return this.serializeError(content);
+        }
+
+        if (content instanceof Date) {
+            return {
+                __type: 'Date',
+                value: content.toISOString()
+            };
+        }
+
+        if (content instanceof RegExp) {
+            return {
+                __type: 'RegExp',
+                value: content.toString()
+            };
+        }
+
+        if (Array.isArray(content)) {
+            return content.map(item => this.serializeContent(item));
+        }
+
+        if (typeof content === 'object') {
+            return safeJsonStringify(content);
+        }
+
+        return String(content);
+    }
+
+    /**
+     * 序列化错误对象
+     */
+    private serializeError(error: Error | string): any {
+        if (typeof error === 'string') {
+            return {
+                __type: 'Error',
+                message: error,
+                timestamp: Date.now()
+            };
+        }
+
+        return {
+            __type: 'Error',
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            timestamp: Date.now()
+        };
+    }
+
+    /**
+     * 设置配置
+     */
+    updateConfig(config: Partial<CustomReportConfig>): void {
+        this.config = { ...this.config, ...config };
+        this.logger.log('CustomReportPlugin config updated:', config);
+    }
+
+    /**
+     * 获取配置
+     */
+    getConfig(): CustomReportConfig {
+        return { ...this.config };
+    }
+}
