@@ -13,6 +13,13 @@ export enum ErrorType {
     UNHANDLED_REJECTION = 'unhandled_rejection'
 }
 
+interface StackInfo {
+    stack: string;
+    filename: string;
+    lineno: number;
+    colno: number;
+}
+
 /**
  * 错误信息接口
  */
@@ -24,7 +31,7 @@ interface ErrorInfo {
     lineno?: number;
     colno?: number;
     stack?: string;
-    originalStack?: string | string[]; // source map 解析后的堆栈
+    originalStack?: string | StackInfo[]; // source map 解析后的堆栈
     componentStack?: string; // React/Vue 组件堆栈
     props?: any; // React 错误边界中的 props
     errorInfo?: any; // 额外错误信息
@@ -49,7 +56,6 @@ interface ErrorConfig {
     behaviorDelay: number; // 错误发生后延迟上报时间(ms)
     maxBehaviorRecords: number; // 最大行为记录数
     enableSourceMap: boolean; // 是否启用source map解析
-    sourceMapRetryCount: number; // source map请求重试次数
     filterErrors: (error: ErrorInfo) => boolean; // 错误过滤函数
 }
 
@@ -64,12 +70,11 @@ export class ErrorPlugin extends Plugin {
         behaviorDelay: 5000, // 5秒延迟
         maxBehaviorRecords: 50,
         enableSourceMap: true,
-        sourceMapRetryCount: 2,
         filterErrors: () => true
     };
 
     private behaviorQueue: UserAction[] = [];
-    private pendingErrors: Map<string, { error: ErrorInfo; timer: number | undefined }> = new Map();
+    private pendingErrors: Map<string, { error: ErrorInfo; timer: NodeJS.Timeout }> = new Map();
     private logger: any;
 
     constructor(config?: Partial<ErrorConfig>) {
@@ -106,7 +111,7 @@ export class ErrorPlugin extends Plugin {
         this.stopBehaviorTracking();
 
         // 清除所有pending的错误定时器
-        this.pendingErrors.forEach(({ timer }) => timer && clearTimeout(timer));
+        this.pendingErrors.forEach(({ timer }) => clearTimeout(timer));
         this.pendingErrors.clear();
     }
 
@@ -183,7 +188,7 @@ export class ErrorPlugin extends Plugin {
         if (this.config.enableSourceMap && errorInfo.stack) {
             const originalStack = await this.parseSourceMap(errorInfo.stack);
             errorInfo.originalStack = originalStack;
-            if (originalStack?.length) {
+            if (Array.isArray(originalStack) && originalStack?.length) {
                 const firstStack = originalStack[0];
                 errorInfo.lineno = firstStack.lineno;
                 errorInfo.colno = firstStack.colno;
@@ -198,7 +203,7 @@ export class ErrorPlugin extends Plugin {
         }
 
         // 需要行为上报，延迟上报
-        const timer = setTimeout(async () => {
+        let timer = setTimeout(async () => {
             await this.reportError(errorInfo);
             this.pendingErrors.delete(errorInfo.id);
         }, this.config.behaviorDelay);
@@ -297,7 +302,7 @@ export class ErrorPlugin extends Plugin {
     /**
      * 解析source map
      */
-    private async parseSourceMap(stack: string): Promise<string | string[]> {
+    private async parseSourceMap(stack: string): Promise<string | StackInfo[]> {
         if (!this.config.enableSourceMap) return stack;
 
         try {
@@ -362,7 +367,7 @@ export class ErrorPlugin extends Plugin {
         line: number,
         column: number
     ): Promise<{ source: string; line: number; column: number } | null> {
-        try {
+        /*try {
             // 尝试获取source map文件
             const mapUrl = `${filename}.map`;
             let retryCount = 0;
@@ -389,7 +394,7 @@ export class ErrorPlugin extends Plugin {
             }
         } catch (error) {
             // 忽略source map获取错误
-        }
+        }*/
 
         return null;
     }
@@ -563,7 +568,7 @@ export class ErrorPlugin extends Plugin {
      */
     async reportPendingErrors(): Promise<void> {
         const promises = Array.from(this.pendingErrors.values()).map(async ({ error, timer }) => {
-            timer && clearTimeout(timer);
+            clearTimeout(timer);
             await this.reportError(error);
         });
 
