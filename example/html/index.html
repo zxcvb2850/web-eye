@@ -18,6 +18,18 @@
     }).catch(error => {
         console.log("axios error: ",  error);
     });
+
+    setTimeout(()=>{
+        const obj = {a: 1, b: {c: 2}, d: {e: {f: 3}}};
+        console.info("a: ", obj.a)
+        console.info("b: ", obj.b)
+        console.info("c: ", obj.b.c)
+        console.info("d: ", obj.d)
+        console.info("e: ", obj.d.e)
+        console.info("f: ", obj.d.e.f)
+        console.info("g: ", obj.d.e.f.g.h);
+    }, 2000)
 </script>
+<script src="dddddd.js"></script>
 </body>
 </html>

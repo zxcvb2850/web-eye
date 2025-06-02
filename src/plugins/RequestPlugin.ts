@@ -230,7 +230,8 @@ export class RequestPlugin extends Plugin {
             const method = (init?.method || "GET").toUpperCase();
 
             const params: any = {};
-            params.query = this.parseQueryParams(url);
+            const query = this.parseQueryParams(url);
+            if (query) params.query = query;
 
             // 获取请求体参数
             if (init?.body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
@@ -326,7 +327,9 @@ export class RequestPlugin extends Plugin {
     private getXHRRequestParams(url: string, body?: Document | XMLHttpRequestBodyInit | null): any {
         try {
             const params: any = {};
-            params.query = this.parseQueryParams(url);
+            const query = this.parseQueryParams(url);
+            if (query) params.query = query;
+
             if (!body) return params;
 
             if (typeof body === "string") {

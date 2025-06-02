@@ -16,13 +16,13 @@ export interface Callback {
 export interface WebEyeConfig  {
     appId: string;
     reportUrl: string;
-    maxRetry?: number;
-    retryDelay?: number;
+    maxRetry?: number; // 上报异常，最大重试次数
+    retryDelay?: number; // 上报异常，重试间隔
     enableHash?: boolean;
     enableHistory?: boolean;
     whiteScreenThreshold?: number;
     performanceThreshold?: number;
-    enableAutoReport?: boolean;
+    enableAutoReport?: boolean; // 是否定时上报
     batchSize?: number;
     flushInterval?: number;
 }
@@ -48,6 +48,7 @@ export enum MonitorType {
     ROUTE = 'route',
     BEHAVIOR = 'behavior',
     WHITE_SCREEN = 'white_screen',
+    RESOURCE = 'resource',
     CUSTOM = 'custom',
 }
 
@@ -56,8 +57,10 @@ export interface DeviceInfo {
     userAgent: string;
     language: string;
     platform: string;
-    screenWidth: number;
-    screenHeight: number;
+    screen: {
+        width: number;
+        height: number;
+    },
     viewport: {
         width: number;
         height: number;

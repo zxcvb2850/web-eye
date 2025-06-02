@@ -11,8 +11,7 @@ export function getDeviceInfo(): DeviceInfo {
         userAgent: navigator.userAgent,
         language: navigator.language,
         platform: navigator.platform,
-        screenWidth: screen.width,
-        screenHeight: screen.height,
+        screen: {width: screen.width, height: screen.height},
         viewport: { width: innerWidth, height: innerHeight },
         connection: getNetworkInfo(),
     }

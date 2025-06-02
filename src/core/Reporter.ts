@@ -90,17 +90,17 @@ export class Reporter implements IReporter {
     private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
         try {
             // 尝试使用 sendBeacon API 发送数据
-            if (navigator.sendBeacon && data.length < 5) {
+            /*if (navigator.sendBeacon && data.length < 5) {
                 const success = navigator.sendBeacon(
                     this.config.reportUrl,
                     safeJsonStringify(data),
                 )
 
                 if (success) return true;
-            }
+            }*/
 
             // 使用 fetch API 发送数据
-            const request = await fetch(this.config.reportUrl, {
+            /*const request = await fetch(this.config.reportUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -108,8 +108,9 @@ export class Reporter implements IReporter {
                 body: safeJsonStringify(data),
                 keepalive: true,
             })
-
-            return request.ok;
+            return request.ok;*/
+            console.info("Core SendRequest Data =====> ", data);
+            return true;
         } catch (error) {
             return false;
         }
