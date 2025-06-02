@@ -26,7 +26,7 @@ export function throttle<T extends (...args: any[]) => any>(
     func: T,
     delay: number,
 ): (...args: Parameters<T>) => void {
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: number | null = null;
     let lastExecTime = 0;
 
     return (...args: Parameters<T>) => {
@@ -54,7 +54,7 @@ export function debounce<T extends (...args: any[]) => any>(
     func: T,
     delay: number,
 ): (...args: Parameters<T>) => void {
-    let timeoutId: NodeJS.Timeout | null = null;
+    let timeoutId: number | null = null;
 
     return (...args: Parameters<T>) => {
         if (timeoutId) {
@@ -105,9 +105,9 @@ export function safeJsonParse<T = any>(str: string, defaultValue: T = {} as T): 
 /**
  * JSON 序列化 string
  * */
-export function safeJsonStringify(obj: any, replacer?: (key: string, value: any) => any): string {
+export function safeJsonStringify(obj: any, replacer?: (this: any, key: string, value: any) => any): string {
     try {
-        return JSON.stringify(obj, replacer);
+        return JSON.stringify(obj, replacer as (this: any, key: string, value: any) => any);
     } catch {
         return '{}';
     }

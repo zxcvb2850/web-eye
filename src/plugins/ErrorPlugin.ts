@@ -1,6 +1,7 @@
 import { Plugin } from "../core/Plugin";
 import { LoggerPlugin } from "./LoggerPlugin";
-import { generateId, sleep } from "../utils/common";
+import {generateId, sleep, throttle} from "../utils/common";
+import {MonitorType} from "../types";
 
 /**
  * 错误类型枚举
@@ -23,13 +24,11 @@ interface ErrorInfo {
     lineno?: number;
     colno?: number;
     stack?: string;
-    originalStack?: string; // source map 解析后的堆栈
+    originalStack?: string | string[]; // source map 解析后的堆栈
     componentStack?: string; // React/Vue 组件堆栈
     props?: any; // React 错误边界中的 props
     errorInfo?: any; // 额外错误信息
     timestamp: number;
-    url: string;
-    userAgent: string;
 }
 
 /**
@@ -51,8 +50,6 @@ interface ErrorConfig {
     maxBehaviorRecords: number; // 最大行为记录数
     enableSourceMap: boolean; // 是否启用source map解析
     sourceMapRetryCount: number; // source map请求重试次数
-    enableReactErrorBoundary: boolean; // 是否启用React错误边界
-    enableVueErrorHandler: boolean; // 是否启用Vue错误处理
     filterErrors: (error: ErrorInfo) => boolean; // 错误过滤函数
 }
 
@@ -67,17 +64,13 @@ export class ErrorPlugin extends Plugin {
         behaviorDelay: 5000, // 5秒延迟
         maxBehaviorRecords: 50,
         enableSourceMap: true,
-        sourceMapRetryCount: 3,
-        enableReactErrorBoundary: true,
-        enableVueErrorHandler: true,
+        sourceMapRetryCount: 2,
         filterErrors: () => true
     };
 
     private behaviorQueue: UserAction[] = [];
-    private pendingErrors: Map<string, { error: ErrorInfo; timer: NodeJS.Timeout }> = new Map();
+    private pendingErrors: Map<string, { error: ErrorInfo; timer: number | undefined }> = new Map();
     private logger: any;
-    private originalReactCreateElement: any;
-    private originalVueConfig: any;
 
     constructor(config?: Partial<ErrorConfig>) {
         super();
@@ -89,7 +82,7 @@ export class ErrorPlugin extends Plugin {
         const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
         this.logger = loggerPlugin?.getLogger() || console;
 
-        this.logger.info('Init ErrorPlugin');
+        this.logger.log('Init ErrorPlugin');
 
         // 绑定错误监听
         this.bindErrorListeners();
@@ -99,22 +92,12 @@ export class ErrorPlugin extends Plugin {
             this.startBehaviorTracking();
         }
 
-        // 启用React错误边界
-        if (this.config.enableReactErrorBoundary) {
-            this.enableReactErrorBoundary();
-        }
-
-        // 启用Vue错误处理
-        if (this.config.enableVueErrorHandler) {
-            this.enableVueErrorHandler();
-        }
-
         // 绑定页面卸载事件
         this.bindBeforeUnload();
     }
 
     protected destroy(): void {
-        this.logger.info('Destroy ErrorPlugin');
+        this.logger.log('Destroy ErrorPlugin');
 
         // 移除错误监听
         this.removeErrorListeners();
@@ -122,12 +105,8 @@ export class ErrorPlugin extends Plugin {
         // 停止行为追踪
         this.stopBehaviorTracking();
 
-        // 恢复React和Vue原始方法
-        this.restoreReactErrorBoundary();
-        this.restoreVueErrorHandler();
-
         // 清除所有pending的错误定时器
-        this.pendingErrors.forEach(({ timer }) => clearTimeout(timer));
+        this.pendingErrors.forEach(({ timer }) => timer && clearTimeout(timer));
         this.pendingErrors.clear();
     }
 
@@ -166,8 +145,6 @@ export class ErrorPlugin extends Plugin {
                 colno: event.colno,
                 stack: event.error?.stack,
                 timestamp: Date.now(),
-                url: window.location.href,
-                userAgent: navigator.userAgent
             };
 
             this.processError(errorInfo);
@@ -185,8 +162,6 @@ export class ErrorPlugin extends Plugin {
                 message: event.reason?.message || String(event.reason),
                 stack: event.reason?.stack,
                 timestamp: Date.now(),
-                url: window.location.href,
-                userAgent: navigator.userAgent
             };
 
             this.processError(errorInfo);
@@ -206,7 +181,14 @@ export class ErrorPlugin extends Plugin {
 
         // 如果启用source map，尝试解析原始位置
         if (this.config.enableSourceMap && errorInfo.stack) {
-            errorInfo.originalStack = await this.parseSourceMap(errorInfo.stack);
+            const originalStack = await this.parseSourceMap(errorInfo.stack);
+            errorInfo.originalStack = originalStack;
+            if (originalStack?.length) {
+                const firstStack = originalStack[0];
+                errorInfo.lineno = firstStack.lineno;
+                errorInfo.colno = firstStack.colno;
+                errorInfo.filename = firstStack.filename;
+            }
         }
 
         // 如果不需要行为上报，直接上报错误
@@ -217,7 +199,7 @@ export class ErrorPlugin extends Plugin {
 
         // 需要行为上报，延迟上报
         const timer = setTimeout(async () => {
-            await this.reportErrorWithBehavior(errorInfo);
+            await this.reportError(errorInfo);
             this.pendingErrors.delete(errorInfo.id);
         }, this.config.behaviorDelay);
 
@@ -225,72 +207,7 @@ export class ErrorPlugin extends Plugin {
     }
 
     /**
-     * 启用React错误边界
-     */
-    private enableReactErrorBoundary(): void {
-        // 检查React是否存在
-        if (typeof window !== 'undefined' && (window as any).React) {
-            const React = (window as any).React;
-
-            // 保存原始方法
-            this.originalReactCreateElement = React.createElement;
-
-            // 创建高阶组件来包装错误边界
-            const ErrorBoundaryWrapper = class extends React.Component {
-                constructor(props: any) {
-                    super(props);
-                    this.state = { hasError: false };
-                }
-
-                static getDerivedStateFromError(error: Error) {
-                    return { hasError: true };
-                }
-
-                componentDidCatch(error: Error, errorInfo: any) {
-                    const plugin = (window as any).__errorPlugin;
-                    if (plugin) {
-                        plugin.handleReactError(error, errorInfo, this.props);
-                    }
-                }
-
-                render() {
-                    if ((this.state as any).hasError) {
-                        return this.props.fallback || React.createElement('div', {}, 'Something went wrong.');
-                    }
-                    return this.props.children;
-                }
-            };
-
-            // 挂载插件实例到全局，供错误边界使用
-            (window as any).__errorPlugin = this;
-        }
-    }
-
-    /**
-     * 启用Vue错误处理
-     */
-    private enableVueErrorHandler(): void {
-        // 检查Vue是否存在
-        if (typeof window !== 'undefined' && (window as any).Vue) {
-            const Vue = (window as any).Vue;
-
-            // 保存原始配置
-            this.originalVueConfig = Vue.config.errorHandler;
-
-            // 设置全局错误处理器
-            Vue.config.errorHandler = (error: Error, vm: any, info: string) => {
-                this.handleVueError(error, vm, info);
-
-                // 调用原始错误处理器
-                if (this.originalVueConfig) {
-                    this.originalVueConfig(error, vm, info);
-                }
-            };
-        }
-    }
-
-    /**
-     * 处理React错误
+     * 处理React错误（由用户调用此API）
      */
     private handleReactError(error: Error, errorInfo: any, props?: any): void {
         this.safeExecute(() => {
@@ -303,8 +220,6 @@ export class ErrorPlugin extends Plugin {
                 props: this.serializeProps(props),
                 errorInfo,
                 timestamp: Date.now(),
-                url: window.location.href,
-                userAgent: navigator.userAgent
             };
 
             this.processError(errorInfoObj);
@@ -312,7 +227,7 @@ export class ErrorPlugin extends Plugin {
     }
 
     /**
-     * 处理Vue错误
+     * 处理Vue错误（由用户调用此API）
      */
     private handleVueError(error: Error, vm: any, info: string): void {
         this.safeExecute(() => {
@@ -328,8 +243,6 @@ export class ErrorPlugin extends Plugin {
                     propsData: vm?.$options?.propsData
                 },
                 timestamp: Date.now(),
-                url: window.location.href,
-                userAgent: navigator.userAgent
             };
 
             this.processError(errorInfo);
@@ -384,17 +297,36 @@ export class ErrorPlugin extends Plugin {
     /**
      * 解析source map
      */
-    private async parseSourceMap(stack: string): Promise<string> {
+    private async parseSourceMap(stack: string): Promise<string | string[]> {
         if (!this.config.enableSourceMap) return stack;
 
         try {
+            // 不解析source map，放置后端解析
+            const lines = stack.split('\n');
+            const mappedLines = [];
+            const len = lines.length;
+            for (let i = 0; i < len; i++) {
+                const line = lines[i];
+                const match = line.match(/at.*\((.*):(\d+):(\d+)\)/);
+                if (match) {
+                    const [stackErr, filename, lineno, colno] = match;
+                    mappedLines.push({
+                        stack: stackErr,
+                        filename,
+                        lineno: Number(lineno),
+                        colno: Number(colno),
+                    })
+
+                    if (mappedLines.length >= 5) break;
+                }
+            }
+
             // 这里实现source map解析逻辑
             // 由于source map解析比较复杂，这里提供基本框架
-            const lines = stack.split('\n');
-            const mappedLines = await Promise.all(
-                lines.map(async (line) => {
+            /*const mappedLines = await Promise.all(
+                lines.map(async (line, index) => {
                     const match = line.match(/at.*\((.*):(\d+):(\d+)\)/);
-                    if (match) {
+                    if (match && index < 5) {
                         const [, filename, lineno, colno] = match;
                         try {
                             const mappedLocation = await this.fetchSourceMapLocation(
@@ -414,9 +346,8 @@ export class ErrorPlugin extends Plugin {
                     }
                     return line;
                 })
-            );
-
-            return mappedLines.join('\n');
+            );*/
+            return mappedLines;
         } catch (error) {
             this.logger.warn('Source map parsing failed:', error);
             return stack;
@@ -438,19 +369,22 @@ export class ErrorPlugin extends Plugin {
 
             while (retryCount < this.config.sourceMapRetryCount) {
                 try {
-                    const response = await fetch(mapUrl);
+                    const headers = { "EyeLogTag": '1'}; // 用于标记是SDK内部发送的请求
+                    const response = await fetch(mapUrl, { headers });
                     if (response.ok) {
                         const sourceMap = await response.json();
                         // 这里需要使用source-map库来解析，简化示例
                         // 实际项目中需要安装并使用source-map库
                         return this.parseSourceMapContent(sourceMap, line, column);
+                    } else {
+                        throw response;
                     }
                 } catch (error) {
                     retryCount++;
                     if (retryCount >= this.config.sourceMapRetryCount) {
                         break;
                     }
-                    await sleep(100 * retryCount); // 重试延迟
+                    await sleep(2000 * retryCount); // 重试延迟
                 }
             }
         } catch (error) {
@@ -501,7 +435,7 @@ export class ErrorPlugin extends Plugin {
         });
 
         // 记录输入事件
-        this.addEventListener(document, 'input', (event) => {
+        /*this.addEventListener(document, 'input', (event) => {
             this.recordUserAction({
                 type: 'input',
                 target: this.getElementSelector(event.target as Element),
@@ -512,23 +446,19 @@ export class ErrorPlugin extends Plugin {
                     name: (event.target as HTMLInputElement)?.name
                 }
             });
-        });
+        });*/
 
         // 记录滚动事件（节流）
-        let scrollTimer: NodeJS.Timeout;
-        this.addEventListener(window, 'scroll', () => {
-            if (scrollTimer) clearTimeout(scrollTimer);
-            scrollTimer = setTimeout(() => {
-                this.recordUserAction({
-                    type: 'scroll',
-                    timestamp: Date.now(),
-                    data: {
-                        scrollY: window.scrollY,
-                        scrollX: window.scrollX
-                    }
-                });
-            }, 100);
-        });
+        this.addEventListener(window, 'scroll', throttle(() => {
+            this.recordUserAction({
+                type: 'scroll',
+                timestamp: Date.now(),
+                data: {
+                    scrollY: window.scrollY,
+                    scrollX: window.scrollX
+                }
+            });
+        }, 5000));
 
         // 记录页面跳转
         this.addEventListener(window, 'hashchange', () => {
@@ -580,28 +510,24 @@ export class ErrorPlugin extends Plugin {
     }
 
     /**
-     * 上报错误（不包含行为）
-     */
-    private async reportError(errorInfo: ErrorInfo): Promise<void> {
-        await this.report({
-            type: 'error',
-            data: errorInfo
-        });
-    }
-
-    /**
      * 上报错误及用户行为
      */
-    private async reportErrorWithBehavior(errorInfo: ErrorInfo): Promise<void> {
+    private async reportError(errorInfo: ErrorInfo): Promise<void> {
         const behaviorData = [...this.behaviorQueue];
 
+        const data: Record<string, any> = { error: errorInfo };
+        if (behaviorData?.length) {
+            data.behaviors = behaviorData;
+        }
+
+        this.logger.log("Report Error Plugin ====> ", {
+            type: MonitorType.CODE,
+            data
+        });
+
         await this.report({
-            type: 'error_with_behavior',
-            data: {
-                error: errorInfo,
-                behaviors: behaviorData,
-                behaviorCount: behaviorData.length
-            }
+            type: MonitorType.CODE,
+            data
         });
     }
 
@@ -626,29 +552,10 @@ export class ErrorPlugin extends Plugin {
     private handleBeforeUnload(): void {
         // 立即上报所有pending的错误
         this.pendingErrors.forEach(async ({ error, timer }) => {
-            clearTimeout(timer);
-            await this.reportErrorWithBehavior(error);
+            timer && clearTimeout(timer);
+            await this.reportError(error);
         });
         this.pendingErrors.clear();
-    }
-
-    /**
-     * 恢复React错误边界
-     */
-    private restoreReactErrorBoundary(): void {
-        if (this.originalReactCreateElement && (window as any).React) {
-            (window as any).React.createElement = this.originalReactCreateElement;
-        }
-        delete (window as any).__errorPlugin;
-    }
-
-    /**
-     * 恢复Vue错误处理
-     */
-    private restoreVueErrorHandler(): void {
-        if ((window as any).Vue) {
-            (window as any).Vue.config.errorHandler = this.originalVueConfig;
-        }
     }
 
     /**
@@ -656,8 +563,8 @@ export class ErrorPlugin extends Plugin {
      */
     async reportPendingErrors(): Promise<void> {
         const promises = Array.from(this.pendingErrors.values()).map(async ({ error, timer }) => {
-            clearTimeout(timer);
-            await this.reportErrorWithBehavior(error);
+            timer && clearTimeout(timer);
+            await this.reportError(error);
         });
 
         this.pendingErrors.clear();

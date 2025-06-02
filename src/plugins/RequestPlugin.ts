@@ -43,7 +43,7 @@ export class RequestPlugin extends Plugin {
                 const method = (init?.method || "GET").toUpperCase();
 
                 // 监控请求白名单
-                if (!_this.shouldMonitorRequest(url)){
+                if (!_this.shouldMonitorRequest(url, init?.headers)){
                     return originalFetch(input, init);
                 }
 
@@ -126,7 +126,7 @@ export class RequestPlugin extends Plugin {
             return function (this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
                 const _webEyeData_ = (this as any)._web_eye_data_;
 
-                if (!_webEyeData_ || !_this.shouldMonitorRequest(_webEyeData_.url)) {
+                if (!_webEyeData_ || !_this.shouldMonitorRequest(_webEyeData_.url, _webEyeData_?.requestHeaders)) {
                     return originalSend.call(this, body);
                 }
 
@@ -398,7 +398,9 @@ export class RequestPlugin extends Plugin {
     /**
      * 检查是否应该监控此请求
      * */
-    private shouldMonitorRequest(url: string): boolean {
+    private shouldMonitorRequest(url: string, headers: HeadersInit | string | undefined): boolean {
+        if (headers?.['EyeLogTag']) return false;
+
         // 过滤掉上报接口的请求，避免无限循环
         return !url.includes(this.monitor.getConfig().reportUrl);
     }

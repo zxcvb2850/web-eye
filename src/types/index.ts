@@ -49,6 +49,7 @@ export enum MonitorType {
     BEHAVIOR = 'behavior',
     WHITE_SCREEN = 'white_screen',
     RESOURCE = 'resource',
+    CODE = 'code',
     CUSTOM = 'custom',
 }
 

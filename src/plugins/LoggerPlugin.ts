@@ -50,7 +50,7 @@ export class LoggerPlugin extends Plugin {
     };
 
     private db: IDBDatabase | null = null;
-    private originalConsole: {
+    private readonly originalConsole: {
         log: typeof console.log;
         warn: typeof console.warn;
         error: typeof console.error;
@@ -75,7 +75,6 @@ export class LoggerPlugin extends Plugin {
         log: (...args: any[]) => this.internalLog(LogLevel.LOG, 'log', args),
         warn: (...args: any[]) => this.internalLog(LogLevel.WARN, 'warn', args),
         error: (...args: any[]) => this.internalLog(LogLevel.ERROR, 'error', args),
-        info: (...args: any[]) => this.internalLogger.info(...args), // info直接调用原生console，不记录
     }
 
     constructor(config?: Partial<LoggerConfig>) {
@@ -143,17 +142,7 @@ export class LoggerPlugin extends Plugin {
      */
     private internalLog(level: LogLevel, levelName: string, args: any[]): void {
         // 先输出到控制台
-        this.internalLogger[levelName as keyof typeof this.internalLogger](...args);
-
-        // 检查日志等级
-        if (level < this.config.logLevel) {
-            return;
-        }
-
-        // 记录到数据库（标记为内部调用，避免被console劫持捕获）
-        this.safeExecute(() => {
-            this.recordLog(level, levelName, args, true);
-        });
+        this.internalLogger[levelName as keyof typeof console](...args);
     }
 
     /**
@@ -168,8 +157,12 @@ export class LoggerPlugin extends Plugin {
         ];
 
         levels.forEach(({ method, level }) => {
-            const originalMethod = this.originalConsole[method as keyof typeof this.originalConsole];
+            const originalMethod = this.originalConsole[method as keyof typeof console];
 
+            // 检查日志等级
+            if (level < this.config.logLevel) {
+                return;
+            }
             (console as any)[method] = (...args: any[]) => {
                 // 先执行原始console方法
                 originalMethod.apply(console, args);
@@ -179,13 +172,8 @@ export class LoggerPlugin extends Plugin {
                     return;
                 }
 
-                // 检查日志等级
-                if (level < this.config.logLevel) {
-                    return;
-                }
-
                 // 记录日志
-                this.recordLog(level, method, args, false);
+                this.recordLog(level, method, args);
             };
         });
     }
@@ -195,14 +183,14 @@ export class LoggerPlugin extends Plugin {
      */
     private restoreConsole(): void {
         Object.keys(this.originalConsole).forEach(method => {
-            (console as any)[method] = this.originalConsole[method as keyof typeof this.originalConsole];
+            (console as any)[method] = this.originalConsole[method as keyof typeof console];
         });
     }
 
     /**
      * 记录日志到IndexedDB
      */
-    private async recordLog(level: LogLevel, levelName: string, args: any[], isInternal: boolean = false): Promise<void> {
+    private async recordLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
         if (!this.db) return;
 
         try {
@@ -213,7 +201,6 @@ export class LoggerPlugin extends Plugin {
                 levelName: levelName.toUpperCase(),
                 message: this.formatMessage(args),
                 args: this.serializeArgs(args),
-                isInternal, // 标记是否为内部调用
             };
 
             // 如果启用堆栈跟踪且是错误日志
