@@ -1,0 +1,89 @@
+/**
+ * 性能监控
+ * */
+import { Plugin } from "../core/Plugin";
+import { MonitorType } from "../types";
+import { LoggerPlugin } from "./LoggerPlugin";
+import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
+
+export class PerformancePlugin extends Plugin {
+    name = 'PerformancePlugin';
+    private logger: any
+
+    protected init(): void {
+        const loggerPlugin = this.monitor.getPlugin("LoggerPlugin") as LoggerPlugin;
+        this.logger = loggerPlugin?.getLogger() || console;
+
+        this.logger.log('Init PerformancePlugin');
+
+        this.collectLCP();
+        this.collectINP();
+        this.collectFCP();
+        this.collectCLS();
+        this.collectTTFB();
+    }
+
+    protected destroy(): void {
+
+    }
+
+    /**
+     * 衡量加载性能（LCP）
+     * */
+    private collectLCP() {
+        onLCP(metric => {
+            this.report({
+                type: MonitorType.PERFORMANCE,
+                data: metric,
+            })
+        });
+    }
+
+    /**
+     * 衡量互动性（INP）
+     * */
+    private collectINP() {
+        onINP(metric => {
+            this.report({
+                type: MonitorType.PERFORMANCE,
+                data: metric,
+            })
+        });
+    }
+
+    /**
+     * 首次内容渲染 (FCP)
+     * */
+    private collectFCP() {
+        onFCP(metric => {
+            this.report({
+                type: MonitorType.PERFORMANCE,
+                data: metric,
+            })
+        });
+    }
+
+    /**
+     * 衡量视觉稳定性（CLS）
+     * */
+    private collectCLS() {
+        onCLS(metric => {
+            this.report({
+                type: MonitorType.PERFORMANCE,
+                data: metric,
+            })
+        });
+    }
+
+    /**
+     * 首次发送字节时间 (TTFB)
+     * */
+    private collectTTFB() {
+        onTTFB(metric => {
+            this.report({
+                type: MonitorType.PERFORMANCE,
+                data: metric,
+            })
+        });
+    }
+}
