@@ -25,8 +25,8 @@ interface CustomReportConfig {
 /**
  * 自定义上报数据插件
  * */
-export class CustomReportPlugin extends Plugin {
-    name = "CustomReportPlugin";
+export class CustomPlugin extends Plugin {
+    name = "CustomPlugin";
     private logger: any;
     private errorPlugin: ErrorPlugin | null = null;
     private config: CustomReportConfig = {
@@ -47,7 +47,7 @@ export class CustomReportPlugin extends Plugin {
         // 获取 ErrorPlugin 实例（用于获取行为数据）
         this.errorPlugin = this.monitor.getPlugin("ErrorPlugin") as ErrorPlugin;
 
-        this.logger.log("Init CustomReportPlugin");
+        this.logger.log("Init CustomPlugin");
     }
 
     protected destroy(): void{
@@ -178,7 +178,7 @@ export class CustomReportPlugin extends Plugin {
      */
     updateConfig(config: Partial<CustomReportConfig>): void {
         this.config = { ...this.config, ...config };
-        this.logger.log('CustomReportPlugin config updated:', config);
+        this.logger.log('CustomPlugin config updated:', config);
     }
 
     /**

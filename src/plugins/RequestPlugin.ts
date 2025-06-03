@@ -399,7 +399,7 @@ export class RequestPlugin extends Plugin {
      * 检查是否应该监控此请求
      * */
     private shouldMonitorRequest(url: string, headers: HeadersInit | string | undefined): boolean {
-        if (headers?.['EyeLogTag']) return false;
+        if (headers && typeof headers === 'object' && 'EyeLogTag' in headers) return false;
 
         // 过滤掉上报接口的请求，避免无限循环
         return !url.includes(this.monitor.getConfig().reportUrl);

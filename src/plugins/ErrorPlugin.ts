@@ -1,7 +1,7 @@
 import { Plugin } from "../core/Plugin";
 import { LoggerPlugin } from "./LoggerPlugin";
-import {generateId, sleep, throttle} from "../utils/common";
-import {MonitorType} from "../types";
+import { generateId, throttle } from "../utils/common";
+import { MonitorType } from "../types";
 
 /**
  * 错误类型枚举
@@ -119,12 +119,11 @@ export class ErrorPlugin extends Plugin {
      * 绑定全局错误监听器
      */
     private bindErrorListeners(): void {
-        // JS运行时错误
-        // @ts-ignore
+        // @ts-ignore JS运行时错误
         this.addEventListener(window, 'error', this.handleJSError.bind(this));
 
-        // Promise未捕获错误（如果需要的话可以启用）
-        // this.addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
+        // @ts-ignore Promise未捕获错误（如果需要的话可以启用
+        this.addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
     }
 
     /**
@@ -133,7 +132,8 @@ export class ErrorPlugin extends Plugin {
     private removeErrorListeners(): void {
         // @ts-ignore
         this.removeEventListener(window, 'error', this.handleJSError.bind(this));
-        // this.removeEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
+        // @ts-ignore
+        this.removeEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
     }
 
     /**
@@ -214,7 +214,7 @@ export class ErrorPlugin extends Plugin {
     /**
      * 处理React错误（由用户调用此API）
      */
-    private handleReactError(error: Error, errorInfo: any, props?: any): void {
+    public handleReactError(error: Error, errorInfo: any, props?: any): void {
         this.safeExecute(() => {
             const errorInfoObj: ErrorInfo = {
                 id: generateId(),
@@ -234,10 +234,12 @@ export class ErrorPlugin extends Plugin {
     /**
      * 处理Vue错误（由用户调用此API）
      */
-    private handleVueError(error: Error, vm: any, info: string): void {
+    public handleVueError(error: Error, vm: any, info: string): void {
         this.safeExecute(() => {
             const errorInfo: ErrorInfo = {
                 id: generateId(),
+
+
                 type: ErrorType.VUE_ERROR,
                 message: error.message,
                 stack: error.stack,

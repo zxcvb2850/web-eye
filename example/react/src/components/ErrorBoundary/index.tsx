@@ -1,4 +1,4 @@
-import React, {Component} from "react";
+import { Component } from "react";
 
 class ErrorBoundary extends Component<any, any> {
     constructor(props) {
@@ -16,9 +16,7 @@ class ErrorBoundary extends Component<any, any> {
         // logErrorToMyService(error, errorInfo);
 
         // @ts-ignore
-        const errorPlugin = window._eyeLogReport.getPlugin("ErrorPlugin")
-        // console.info("errorPlugin", errorPlugin)
-        errorPlugin.handleReactError(error, errorInfo)
+        window.errorPlugin.handleReactError(error, errorInfo)
     }
 
     render() {

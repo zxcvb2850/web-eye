@@ -40,3 +40,16 @@
 .read-the-docs {
   color: #888;
 }
+
+.white {
+  color: #FFF !important;
+}
+.white p {
+  color: #FFF !important;
+}
+.white img {
+  opacity: 0;
+}
+.white input {
+  opacity: 0;
+}
