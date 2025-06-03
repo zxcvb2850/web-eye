@@ -3,6 +3,7 @@ import {LoggerPlugin} from "./LoggerPlugin";
 import {ErrorPlugin} from "./ErrorPlugin";
 import {generateId, safeJsonStringify} from "../utils/common";
 import {MonitorType} from "../types";
+import {RecordPlugin} from "./RecordPlugin";
 
 // 自定义上报数据接口
 interface CustomReportData {
@@ -14,6 +15,7 @@ interface CustomReportData {
 // 上报配置接口
 interface ReportOptions {
     includeBehavior?: boolean; // 是否包含行为数据
+    reportRecord?: boolean; // 是否上报录制数据
 }
 
 // 自定义上报插件配置
@@ -29,6 +31,8 @@ export class CustomPlugin extends Plugin {
     name = "CustomPlugin";
     private logger: any;
     private errorPlugin: ErrorPlugin | null = null;
+    private recordPlugin: RecordPlugin | null = null;
+
     private config: CustomReportConfig = {
         maxContentLength: 10000,        // 10KB
         maxBehaviorRecords: 20,
@@ -47,6 +51,9 @@ export class CustomPlugin extends Plugin {
         // 获取 ErrorPlugin 实例（用于获取行为数据）
         this.errorPlugin = this.monitor.getPlugin("ErrorPlugin") as ErrorPlugin;
 
+        // 获取 RecordPlugin 实例
+        this.recordPlugin = this.monitor.getPlugin("RecordPlugin") as RecordPlugin;
+
         this.logger.log("Init CustomPlugin");
     }
 
@@ -62,13 +69,14 @@ export class CustomPlugin extends Plugin {
             const reportId = data?.id || generateId();
 
             const content = this.serializeContent(data);
-            const reportOtherData = this.prepareReportData(options);
+            const reportOtherData = this.prepareReportData(options, reportId);
 
             this.report({
                 type: MonitorType.CUSTOM,
                 data: {
                     reportId,
-                    payload: {...reportOtherData, content},
+                    ...reportOtherData,
+                    content,
                 }
             })
 
@@ -93,7 +101,7 @@ export class CustomPlugin extends Plugin {
     /**
      * 自定义上报携带其他数据
      * */
-    private prepareReportData(options: ReportOptions): CustomReportData & { behaviors?: any[] } {
+    private prepareReportData(options: ReportOptions, reportId: string): CustomReportData & { behaviors?: any[] } {
         const reportData: any = {};
 
         // 添加用户行为数据
@@ -105,6 +113,15 @@ export class CustomPlugin extends Plugin {
                 }
             } catch (error) {
                this.logger.warn(`Add user behaviors failed ====>`, error);
+            }
+        }
+
+        // 上报用户录制
+        if (options.reportRecord && this.recordPlugin) {
+            try {
+                this.recordPlugin.errorTrigger({errorId: reportId});
+            } catch (error) {
+                this.logger.warn(`Add user record failed ====>`, error);
             }
         }
 

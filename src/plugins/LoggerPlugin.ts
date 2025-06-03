@@ -142,7 +142,7 @@ export class LoggerPlugin extends Plugin {
      */
     private internalLog(level: LogLevel, levelName: string, args: any[]): void {
         // 先输出到控制台
-        this.internalLogger[levelName as keyof typeof console](...args);
+        this.internalLogger[levelName as keyof typeof this.internalLogger](...args);
     }
 
     /**
@@ -157,7 +157,7 @@ export class LoggerPlugin extends Plugin {
         ];
 
         levels.forEach(({ method, level }) => {
-            const originalMethod = this.originalConsole[method as keyof typeof console];
+            const originalMethod = this.originalConsole[method as keyof typeof this.originalConsole];
 
             // 检查日志等级
             if (level < this.config.logLevel) {
@@ -183,7 +183,7 @@ export class LoggerPlugin extends Plugin {
      */
     private restoreConsole(): void {
         Object.keys(this.originalConsole).forEach(method => {
-            (console as any)[method] = this.originalConsole[method as keyof typeof console];
+            (console as any)[method] = this.originalConsole[method as keyof typeof this.originalConsole];
         });
     }
 

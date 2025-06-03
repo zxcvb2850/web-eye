@@ -99,10 +99,6 @@ interface RecordConfig {
     // 数据管理
     maxEvents: number; // 单次录制最大事件数
 
-    // 错误触发配置
-    errorTriggerDelay: number; // 错误触发延迟(ms)
-    errorTypes: string[]; // 触发录制的错误类型
-
     // 压缩配置
     enableCompression: boolean; // 启用压缩
     compressionLevel: number; // 压缩级别 1-9
@@ -140,8 +136,8 @@ export class RecordPlugin extends Plugin {
             collectFonts: false,     // 是否收集字体
             sampling: {
                 scroll: 800,         // 滚动事件采样间隔
-                mousemove: false,       // 鼠标移动采样间隔
-                mouseInteraction: false, // 鼠标交互事件
+                mousemove: 600,       // 鼠标移动采样间隔
+                mouseInteraction: true, // 鼠标交互事件
                 input: 'last'        // 输入事件采样策略
             }
         },
@@ -151,10 +147,6 @@ export class RecordPlugin extends Plugin {
 
         // 数据管理
         maxEvents: 1000,
-
-        // 错误触发配置
-        errorTriggerDelay: 1000, // 1秒延迟
-        errorTypes: ['js_error', 'unhandled_rejection', 'react_error', 'vue_error'],
 
         // 压缩配置
         enableCompression: true,
@@ -293,12 +285,6 @@ export class RecordPlugin extends Plugin {
      * 错误触发录制
      */
     public errorTrigger(errorData: any): string | null {
-        // 检查错误类型是否在配置中
-        if (this.config.errorTypes.length > 0 && !this.config.errorTypes.includes(errorData.type)) {
-            this.logger.log('Error type not in trigger list:', errorData.type);
-            return null;
-        }
-
         this.logger.log('Error triggered recording:', errorData);
 
         // 延迟触发，给错误处理一些时间
