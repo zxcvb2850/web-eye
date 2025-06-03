@@ -47,6 +47,7 @@ export enum MonitorType {
     ERROR = 'error',
     ROUTE = 'route',
     BEHAVIOR = 'behavior',
+    RECORD = 'record',
     WHITE_SCREEN = 'white_screen',
     RESOURCE = 'resource',
     CODE = 'code',

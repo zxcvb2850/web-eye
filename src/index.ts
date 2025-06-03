@@ -6,6 +6,7 @@ import {ResourcePlugin} from "./plugins/ResourcePlugin";
 import {ErrorPlugin} from "./plugins/ErrorPlugin";
 import {CustomPlugin} from "./plugins/CustomPlugin";
 import {WhiteScreenPlugin} from "./plugins/WhiteScreenPlugin";
+import {PerformancePlugin} from "./plugins/PerformancePlugin";
 
 export function initEyeLogs(options: WebEyeConfig): Monitor {
     const monitor = new Monitor(options);
@@ -17,6 +18,7 @@ export function initEyeLogs(options: WebEyeConfig): Monitor {
             skipSelectors: ["meta", "head", "script", "style"], // 忽略的元素选择器(checkDOMCount 为 true 时生效)
             whiteScreenDoms: ["#root"],
         }))
+        .use(new PerformancePlugin())
         .use(new CustomPlugin())
         .use(new ErrorPlugin({
             enableBehaviorReport: false,      // 启用行为上报

@@ -2,6 +2,7 @@ import { Plugin } from "../core/Plugin";
 import { LoggerPlugin } from "./LoggerPlugin";
 import { generateId, throttle } from "../utils/common";
 import { MonitorType } from "../types";
+import { RecordPlugin } from "./RecordPlugin";
 
 /**
  * 错误类型枚举
@@ -36,6 +37,7 @@ interface ErrorInfo {
     props?: any; // React 错误边界中的 props
     errorInfo?: any; // 额外错误信息
     timestamp: number;
+    recordSessionId?: string; // 关联录制会话ID
 }
 
 /**
@@ -57,6 +59,7 @@ interface ErrorConfig {
     maxBehaviorRecords: number; // 最大行为记录数
     enableSourceMap: boolean; // 是否启用source map解析
     filterErrors: (error: ErrorInfo) => boolean; // 错误过滤函数
+    enableRecordTrigger: boolean; // 是否启用录制触发
 }
 
 /**
@@ -70,12 +73,14 @@ export class ErrorPlugin extends Plugin {
         behaviorDelay: 5000, // 5秒延迟
         maxBehaviorRecords: 50,
         enableSourceMap: true,
-        filterErrors: () => true
+        filterErrors: () => true,
+        enableRecordTrigger: true,
     };
 
     private behaviorQueue: UserAction[] = [];
     private pendingErrors: Map<string, { error: ErrorInfo; timer: NodeJS.Timeout }> = new Map();
     private logger: any;
+    private recordPlugin: RecordPlugin | null = null;
 
     constructor(config?: Partial<ErrorConfig>) {
         super();
@@ -86,6 +91,9 @@ export class ErrorPlugin extends Plugin {
         // 获取Logger实例
         const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
         this.logger = loggerPlugin?.getLogger() || console;
+
+        // 获取RecordPlugin实例
+        this.recordPlugin = this.monitor.getPlugin('RecordPlugin') as RecordPlugin;
 
         this.logger.log('Init ErrorPlugin');
 
@@ -183,6 +191,22 @@ export class ErrorPlugin extends Plugin {
         }
 
         this.logger.error('Captured error:', errorInfo.message);
+
+        // 触发录制（如果启用）
+        if (this.config.enableRecordTrigger && this.recordPlugin) {
+            const recordSessionId = this.recordPlugin.errorTrigger({
+                errorId: errorInfo.id,
+                type: errorInfo.type,
+                message: errorInfo.message,
+                timestamp: errorInfo.timestamp
+            });
+
+            // 将录制会话ID关联到错误信息
+            if (recordSessionId) {
+                errorInfo.recordSessionId = recordSessionId;
+                this.logger.log(`Error ${errorInfo.id} triggered recording session: ${recordSessionId}`);
+            }
+        }
 
         // 如果启用source map，尝试解析原始位置
         if (this.config.enableSourceMap && errorInfo.stack) {
@@ -327,99 +351,10 @@ export class ErrorPlugin extends Plugin {
                     if (mappedLines.length >= 5) break;
                 }
             }
-
-            // 这里实现source map解析逻辑
-            // 由于source map解析比较复杂，这里提供基本框架
-            /*const mappedLines = await Promise.all(
-                lines.map(async (line, index) => {
-                    const match = line.match(/at.*\((.*):(\d+):(\d+)\)/);
-                    if (match && index < 5) {
-                        const [, filename, lineno, colno] = match;
-                        try {
-                            const mappedLocation = await this.fetchSourceMapLocation(
-                                filename,
-                                parseInt(lineno),
-                                parseInt(colno)
-                            );
-                            if (mappedLocation) {
-                                return line.replace(
-                                    `${filename}:${lineno}:${colno}`,
-                                    `${mappedLocation.source}:${mappedLocation.line}:${mappedLocation.column}`
-                                );
-                            }
-                        } catch (error) {
-                            // source map解析失败，返回原始行
-                        }
-                    }
-                    return line;
-                })
-            );*/
             return mappedLines;
         } catch (error) {
             this.logger.warn('Source map parsing failed:', error);
             return stack;
-        }
-    }
-
-    /**
-     * 获取source map位置信息
-     */
-    private async fetchSourceMapLocation(
-        filename: string,
-        line: number,
-        column: number
-    ): Promise<{ source: string; line: number; column: number } | null> {
-        /*try {
-            // 尝试获取source map文件
-            const mapUrl = `${filename}.map`;
-            let retryCount = 0;
-
-            while (retryCount < this.config.sourceMapRetryCount) {
-                try {
-                    const headers = { "EyeLogTag": '1'}; // 用于标记是SDK内部发送的请求
-                    const response = await fetch(mapUrl, { headers });
-                    if (response.ok) {
-                        const sourceMap = await response.json();
-                        // 这里需要使用source-map库来解析，简化示例
-                        // 实际项目中需要安装并使用source-map库
-                        return this.parseSourceMapContent(sourceMap, line, column);
-                    } else {
-                        throw response;
-                    }
-                } catch (error) {
-                    retryCount++;
-                    if (retryCount >= this.config.sourceMapRetryCount) {
-                        break;
-                    }
-                    await sleep(2000 * retryCount); // 重试延迟
-                }
-            }
-        } catch (error) {
-            // 忽略source map获取错误
-        }*/
-
-        return null;
-    }
-
-    /**
-     * 解析source map内容（简化版本）
-     */
-    private parseSourceMapContent(
-        sourceMap: any,
-        line: number,
-        column: number
-    ): { source: string; line: number; column: number } | null {
-        // 这里应该使用专业的source-map库来解析
-        // 由于库较大，这里提供简化的示例框架
-        try {
-            // 实际解析逻辑需要source-map库
-            return {
-                source: sourceMap.sources?.[0] || 'unknown',
-                line: line,
-                column: column
-            };
-        } catch (error) {
-            return null;
         }
     }
 
