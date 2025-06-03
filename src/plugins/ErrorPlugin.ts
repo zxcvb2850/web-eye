@@ -364,13 +364,17 @@ export class ErrorPlugin extends Plugin {
     private startBehaviorTracking(): void {
         // 记录点击事件
         this.addEventListener(document, 'click', (event) => {
+            let classNames: string[] = [];
+            let classList = ((event.target as Element)?.classList || []);
+            classList.forEach((className) => classNames.push(className));
+
             this.recordUserAction({
                 type: 'click',
                 target: this.getElementSelector(event.target as Element),
                 timestamp: Date.now(),
                 data: {
                     tagName: (event.target as Element)?.tagName,
-                    className: (event.target as Element)?.className,
+                    className: classNames.join(' '),
                     innerText: (event.target as Element)?.textContent?.slice(0, 50)
                 }
             });
@@ -444,8 +448,8 @@ export class ErrorPlugin extends Plugin {
             return `#${element.id}`;
         }
 
-        if (element.className) {
-            return `.${element.className.split(' ')[0]}`;
+        if (element?.classList?.length) {
+            return `.${element.classList[0]}`;
         }
 
         return element.tagName.toLowerCase();

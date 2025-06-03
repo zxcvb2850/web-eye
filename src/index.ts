@@ -1,12 +1,13 @@
 import {Monitor} from "./core/Monitor";
 import {WebEyeConfig} from "./types";
-import {LoggerPlugin, LogLevel} from "./plugins/LoggerPlugin";
+import {LoggerPlugin} from "./plugins/LoggerPlugin";
 import {RequestPlugin} from "./plugins/RequestPlugin";
 import {ResourcePlugin} from "./plugins/ResourcePlugin";
 import {ErrorPlugin} from "./plugins/ErrorPlugin";
 import {CustomPlugin} from "./plugins/CustomPlugin";
 import {WhiteScreenPlugin} from "./plugins/WhiteScreenPlugin";
 import {PerformancePlugin} from "./plugins/PerformancePlugin";
+import {RecordPlugin} from "./plugins/RecordPlugin";
 
 export function initEyeLogs(options: WebEyeConfig): Monitor {
     const monitor = new Monitor(options);
@@ -29,6 +30,7 @@ export function initEyeLogs(options: WebEyeConfig): Monitor {
         }))
         .use(new RequestPlugin())
         .use(new ResourcePlugin())
+        .use(new RecordPlugin())
         .install();
 
     return monitor
