@@ -1,5 +1,6 @@
 import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
 import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
+import {strToU8, gzipSync} from "fflate";
 
 /**
  * 数据上报器
@@ -10,9 +11,13 @@ export class Reporter implements IReporter {
     private timer: NodeJS.Timeout | null = null;
     private isReporting = false;
 
+    // sendBeacon 数据大小限制（通常为64KB）
+    private readonly BEACON_SIZE_LIMIT = 64 * 1024;
+    // 压缩阈值，超过此大小才进行压缩
+    private readonly COMPRESS_THRESHOLD = 1024;
+
     constructor(config: WebEyeConfig) {
         this.config = config;
-        this.startBatchTimer();
         this.bindBeforeUnload();
     }
 
@@ -22,15 +27,7 @@ export class Reporter implements IReporter {
     async report(data: BaseMonitorData | BaseMonitorData[]): Promise<void> {
         const items = Array.isArray(data) ? data: [data];
 
-        if (this.config.enableAutoReport) {
-            this.queue.push(...items);
-
-            if (this.queue.length >= (this.config.batchSize || 10)) {
-                await this.flush();
-            }
-        } else {
-            await this.sendData(items);
-        }
+        await this.sendData(items);
     }
 
     /**
@@ -85,33 +82,111 @@ export class Reporter implements IReporter {
     }
 
     /**
+     * 压缩数据
+     * */
+    private compressData(data: string): { compressed: Uint8Array, isCompressed: boolean } {
+        try {
+            // 检查是否需要压缩数据
+            if (data.length < this.COMPRESS_THRESHOLD) {
+                return {
+                    compressed: strToU8(data),
+                    isCompressed: false,
+                }
+            }
+
+            // gzip 压缩数据
+            const compressed = gzipSync(strToU8(data));
+
+            // 如果压缩后的数据比原始更大，则使用原始数据进行上报
+            if (compressed.length > data.length) {
+                return {
+                    compressed: strToU8(data),
+                    isCompressed: false,
+                }
+            }
+
+            return {
+                compressed,
+                isCompressed: true,
+            }
+        } catch (error) {
+            console.error(`Failed to compress data ====> ${error}`);
+            return {
+                compressed: strToU8(data),
+                isCompressed: false,
+            }
+        }
+    }
+
+    /**
+     * 检查数据是否适合使用 sendBeacon
+     * */
+    private canUseSendBeacon(dataSize: number, dataLength: number): boolean {
+        // 检查浏览器支持
+        if (!navigator.sendBeacon) {
+            return false;
+        }
+
+        // 检查数据大小限制
+        if (dataSize > this.BEACON_SIZE_LIMIT) {
+            return false;
+        }
+
+        // 检查数据条数限制（可根据实际情况调整）
+        if (dataLength > 10) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * 发送 HTTP 请求
      * */
     private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
         try {
-            // 尝试使用 sendBeacon API 发送数据
-            /*if (navigator.sendBeacon && data.length < 5) {
-                const success = navigator.sendBeacon(
-                    this.config.reportUrl,
-                    safeJsonStringify(data),
-                )
+            console.info("Core SendRequest Data =====> ", data);
 
-                if (success) return true;
-            }*/
+            const jsonData = safeJsonStringify(data);
+            const { compressed, isCompressed } = this.compressData(jsonData);
+
+            // 如果数据量过大，则使用分批发送
+            if (compressed.length > this.BEACON_SIZE_LIMIT * 2) {
+                console.info('Large data detected, sending in batches');
+                return false;
+            }
+
+            // 尝试使用 sendBeacon API 发送数据
+            if (this.canUseSendBeacon(compressed.length, data.length)) {
+                const blob = new Blob([compressed], {
+                    type: isCompressed ? 'application/gzip' : 'application/json',
+                });
+
+                const success = navigator.sendBeacon(`${this.config.reportUrl}/beacon`, blob);
+                if (success) {
+                    console.info(`SendBeacon success (${isCompressed ? 'compressed' : 'original'}):`, data.length, 'items');
+                    return true
+                }
+            }
 
             // 使用 fetch API 发送数据
-            /*const request = await fetch(this.config.reportUrl, {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+                'EyeLogTag': '1', // 标记为内部请求
+            }
+            if (isCompressed) {
+                headers['Content-Encoding'] = 'gzip';
+            }
+            const request = await fetch(`${this.config.reportUrl}/fetch`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: safeJsonStringify(data),
+                headers,
+                body: compressed,
                 keepalive: true,
             })
-            return request.ok;*/
-            console.info("Core SendRequest Data =====> ", data);
-            return true;
+            console.info('Send batch ====> ', request);
+            return request.ok;
         } catch (error) {
+            console.error('Send batch error ====> ', error);
             return false;
         }
     }
@@ -121,35 +196,44 @@ export class Reporter implements IReporter {
      * */
     private sendByImage(data: BaseMonitorData[]): Promise<boolean> {
         return new Promise(resolve => {
-            const image = new Image();
-            const timeout = setTimeout(() => {
+            try {
+                const image = new Image();
+                const timeout = setTimeout(() => {
+                    resolve(false);
+                }, 10000);
+
+                image.onload = image.onerror = () => {
+                    clearTimeout(timeout);
+                    resolve(true);
+                }
+
+                // 对于图片请求，数据通过URL参数传递，有长度限制
+                // 这里只发送精简的数据
+                const simplifiedData = data.map(item => ({
+                    type: item.type,
+                    timestamp: item.timestamp,
+                    // 只保留关键字段，避免URL过长
+                }));
+
+                const params = new URLSearchParams({
+                    data: safeJsonStringify(simplifiedData),
+                });
+
+                const url = `${this.config.reportUrl}/img?${params.toString()}`;
+
+                // 检查URL长度限制
+                if (url.length > 2000) {
+                    console.warn('Image request URL too long, skipping');
+                    resolve(false);
+                    return;
+                }
+
+                image.src = url;
+            } catch (error) {
+                console.error('SendByImage error:', error);
                 resolve(false);
-            }, 10000);
-
-            image.onload = image.onerror = () => {
-                clearTimeout(timeout);
-                resolve(true);
             }
-
-            const params = new URLSearchParams({
-                data: safeJsonStringify(data),
-            })
-
-            image.src = `${this.config.reportUrl}?${params.toString()}`
-        })
-    }
-
-    /**
-     * 启动批量上报定时器
-     * */
-    private startBatchTimer(): void {
-        if (!this.config.enableAutoReport) return;
-
-        const interval = this.config.flushInterval || 10000; // 默认 10s
-
-        this.timer = setInterval(() => {
-            this.flush();
-        }, interval);
+        });
     }
 
     /**
