@@ -190,8 +190,6 @@ export class ErrorPlugin extends Plugin {
             return;
         }
 
-        this.logger.error('Captured error:', errorInfo.message);
-
         // 触发录制（如果启用）
         if (this.config.enableRecordTrigger && this.recordPlugin) {
             const recordSessionId = this.recordPlugin.errorTrigger({
@@ -465,11 +463,6 @@ export class ErrorPlugin extends Plugin {
         if (behaviorData?.length) {
             data.behaviors = behaviorData;
         }
-
-        this.logger.log("Report Error Plugin ====> ", {
-            type: MonitorType.CODE,
-            data
-        });
 
         await this.report({
             type: MonitorType.CODE,

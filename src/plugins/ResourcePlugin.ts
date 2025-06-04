@@ -87,11 +87,6 @@ export class ResourcePlugin extends Plugin {
                         type: MonitorType.RESOURCE,
                         data: resourceError
                     })
-
-                    console.info("Resource Error ===> ", {
-                        type: MonitorType.RESOURCE,
-                        data: resourceError
-                    });
                 }
             })
         }

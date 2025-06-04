@@ -24,7 +24,7 @@ export class PerformancePlugin extends Plugin {
     }
 
     protected destroy(): void {
-
+        this.logger.log('Destroy PerformancePlugin')
     }
 
     /**
