@@ -49,6 +49,7 @@ export class LoggerPlugin extends Plugin {
         enableStackTrace: true,
     };
 
+    private isReporting: boolean = false; // 上报标记
     private db: IDBDatabase | null = null;
     private readonly originalConsole: {
         log: typeof console.log;
@@ -212,7 +213,8 @@ export class LoggerPlugin extends Plugin {
 
             // 检查是否需要上报
             const count = await this.getLogCount();
-            if (count >= this.config.maxRecords) {
+            if (count >= this.config.maxRecords && !this.isReporting) {
+                this.isReporting = true;
                 await this.reportAndClearLogs();
             }
         } catch (error) {
@@ -423,6 +425,8 @@ export class LoggerPlugin extends Plugin {
             this.internalLogger.info(`Reported and cleared ${logs.length} log records`);
         } catch (error) {
             this.internalLogger.error("Failed to report logs:", error);
+        } finally {
+            this.isReporting = false;
         }
     }
 
