@@ -32,9 +32,10 @@ export class PerformancePlugin extends Plugin {
      * */
     private collectLCP() {
         onLCP(metric => {
+            const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: metric,
+                data: {id, name, value, rating, navigationType},
             })
         });
     }
@@ -44,9 +45,10 @@ export class PerformancePlugin extends Plugin {
      * */
     private collectINP() {
         onINP(metric => {
+            const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: metric,
+                data: {id, name, value, rating, navigationType},
             })
         });
     }
@@ -56,9 +58,10 @@ export class PerformancePlugin extends Plugin {
      * */
     private collectFCP() {
         onFCP(metric => {
+            const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: metric,
+                data: {id, name, value, rating, navigationType},
             })
         });
     }
@@ -68,9 +71,10 @@ export class PerformancePlugin extends Plugin {
      * */
     private collectCLS() {
         onCLS(metric => {
+            const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: metric,
+                data: {id, name, value, rating, navigationType},
             })
         });
     }
@@ -80,9 +84,10 @@ export class PerformancePlugin extends Plugin {
      * */
     private collectTTFB() {
         onTTFB(metric => {
+            const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: metric,
+                data: {id, name, value, rating, navigationType},
             })
         });
     }

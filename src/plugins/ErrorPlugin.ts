@@ -71,7 +71,7 @@ export class ErrorPlugin extends Plugin {
     private config: ErrorConfig = {
         enableBehaviorReport: true,
         behaviorDelay: 5000, // 5秒延迟
-        maxBehaviorRecords: 50,
+        maxBehaviorRecords: 20,
         enableSourceMap: true,
         filterErrors: () => true,
         enableRecordTrigger: true,
