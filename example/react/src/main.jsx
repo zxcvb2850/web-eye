@@ -15,9 +15,11 @@ import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
 
 const monitor = new Monitor({
     appId: "y",
-    reportUrl: "http://localhost:8080/report",
+    reportUrl: "http://localhost:8080/api/v1",
 })
-const loggerPlugin = new LoggerPlugin();
+const loggerPlugin = new LoggerPlugin({
+    maxRecords: 20,
+});
 const whiteScreenPlugin = new WhiteScreenPlugin({
     enableMutationObserver: false,
     timeout: 5000,
