@@ -72,6 +72,7 @@ export class CustomPlugin extends Plugin {
                     reportId,
                     ...reportOtherData,
                     content,
+                    timestamp: Date.now(),
                 }
             })
 

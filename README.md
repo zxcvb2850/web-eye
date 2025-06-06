@@ -52,7 +52,8 @@
     "content": {
         "__type": string,
         "value": string,
-    }
+    },
+    "timestamp": number
 }
 ```
 
@@ -64,6 +65,7 @@
     "value": number,
     "rating": string,
     "navigationType": string
+    "timestamp": number
 }
 ```
 
@@ -89,7 +91,7 @@
         "errorInfo": {
             "componentStack": string, // react 组件堆栈
         },
-        "timestamp": 1749209558321,
+        "timestamp": number,
         "recordSessionId": string, // 关联id
         "originalStack": [
             {
@@ -132,7 +134,8 @@
     "requestParams": {
         "query": object, // url 请求参数
         "body": object, // post 请求参数
-    }
+    },
+    "timestamp": number,
 }
 ```
 
@@ -147,6 +150,7 @@
         "imageNodes": number, // 检测图片节点个数
         "timestamp": number, // 白屏检测时间
     },
-    "duration": number // 白屏检测耗时
+    "duration": number, // 白屏检测耗时
+    "timestamp": number,
 }
 ```

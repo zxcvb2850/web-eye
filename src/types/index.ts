@@ -101,6 +101,7 @@ export interface RequestData extends BaseMonitorData {
         requestHeaders?: Record<string, string>;
         responseHeaders?: Record<string, string>;
         requestParams?: Record<string, any>;
+        timestamp: number;
     };
 }
 

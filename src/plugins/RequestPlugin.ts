@@ -77,6 +77,7 @@ export class RequestPlugin extends Plugin {
                                 requestHeaders: _this.getRequestHeaders(init?.headers),
                                 responseHeaders: response ? _this.getResponseHeaders(response.headers) : undefined,
                                 requestParams: _this.getRequestParams(input, init),
+                                timestamp: Date.now(),
                             }
                         };
                         _this.report(requestData);
@@ -162,6 +163,7 @@ export class RequestPlugin extends Plugin {
                                     requestHeaders: _webEyeData_.requestHeaders,
                                     responseHeaders: _this.getXHRResponseHeaders(this),
                                     requestParams: _webEyeData_.requestParams,
+                                    timestamp: Date.now(),
                                 }
                             }
                             _this.report(requestData);

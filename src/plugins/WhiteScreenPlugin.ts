@@ -382,7 +382,8 @@ export class WhiteScreenPlugin extends Plugin {
                 type: MonitorType.WHITE_SCREEN,
                 data: {
                     ...result,
-                    duration
+                    duration,
+                    timestamp: Date.now(),
                 }
             });
         });

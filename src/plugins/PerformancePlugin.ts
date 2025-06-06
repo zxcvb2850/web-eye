@@ -30,7 +30,7 @@ export class PerformancePlugin extends Plugin {
             const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: {id, name, value, rating, navigationType},
+                data: {id, name, value, rating, navigationType, timestamp: Date.now()},
             })
         });
     }
@@ -43,7 +43,7 @@ export class PerformancePlugin extends Plugin {
             const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: {id, name, value, rating, navigationType},
+                data: {id, name, value, rating, navigationType, timestamp: Date.now()},
             })
         });
     }
@@ -56,7 +56,7 @@ export class PerformancePlugin extends Plugin {
             const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: {id, name, value, rating, navigationType},
+                data: {id, name, value, rating, navigationType, timestamp: Date.now()},
             })
         });
     }
@@ -69,7 +69,7 @@ export class PerformancePlugin extends Plugin {
             const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: {id, name, value, rating, navigationType},
+                data: {id, name, value, rating, navigationType, timestamp: Date.now()},
             })
         });
     }
@@ -82,7 +82,7 @@ export class PerformancePlugin extends Plugin {
             const {id, name, value, rating, navigationType} = metric;
             this.report({
                 type: MonitorType.PERFORMANCE,
-                data: {id, name, value, rating, navigationType},
+                data: {id, name, value, rating, navigationType, timestamp: Date.now()},
             })
         });
     }
