@@ -46,7 +46,7 @@ export class ResourcePlugin extends Plugin {
     private performanceObserver?: PerformanceObserver;
 
     protected init(): void {
-        console.info("Init ResourcePlugin");
+        this.logger.log("Init ResourcePlugin");
 
         this.interceptResourceErrors();
         this.monitorResourcePerformance();
@@ -107,8 +107,6 @@ export class ResourcePlugin extends Plugin {
                             type: MonitorType.RESOURCE,
                             data: resourceError
                         })
-
-                        console.info("Promise Resource Error =====>", resourceError);
                     }
                 }
             })
@@ -143,8 +141,6 @@ export class ResourcePlugin extends Plugin {
                                         type: MonitorType.RESOURCE,
                                         data: resourceError
                                     });
-
-                                    console.info("Performance Resource Error =====>", resourceError);
                                 }
                             }
                         }
@@ -154,7 +150,7 @@ export class ResourcePlugin extends Plugin {
 
             this.performanceObserver.observe({ entryTypes: ['resource'] });
         } catch (error) {
-            console.warn('Failed to create PerformanceObserver:', error);
+            this.logger.warn('Failed to create PerformanceObserver:', error);
         }
     }
 
@@ -184,7 +180,7 @@ export class ResourcePlugin extends Plugin {
                 loadTime: 0 // 无法准确获取加载时间
             };
         } catch (error) {
-            console.warn('Failed to parse resource error:', error);
+            this.logger.warn('Failed to parse resource error:', error);
             return null;
         }
     }
@@ -447,7 +443,7 @@ export class ResourcePlugin extends Plugin {
             ];
             return !excludePatterns.some(pattern => url.includes(pattern));
         } catch (error) {
-            console.error(`ResourceErrorPlugin ShouldMonitorResource Error: `, error);
+            this.logger.error(`ResourceErrorPlugin ShouldMonitorResource Error: `, error);
             return true;
         }
     }

@@ -6,6 +6,7 @@ import {IPlugin} from "../types";
 export abstract class Plugin implements IPlugin {
     abstract name: string;
     protected monitor: any;
+    protected logger: any;
     protected installed = false;
 
     /**
@@ -18,6 +19,7 @@ export abstract class Plugin implements IPlugin {
         }
 
         this.monitor = monitor;
+        this.logger = this.monitor.logger;
         this.installed = true;
         this.init();
     }
@@ -27,7 +29,7 @@ export abstract class Plugin implements IPlugin {
      * */
     uninstall():void {
         if (!this.installed) {
-            console.warn(`Plugin ${this.name} has not been installed.`);
+            this.logger.warn(`Plugin ${this.name} has not been installed.`);
             return;
         }
 
@@ -69,7 +71,7 @@ export abstract class Plugin implements IPlugin {
         try {
             fn();
         } catch (error) {
-            console.error(`Error in plugin ${this.name}: `, error);
+            this.logger.error(`Error in plugin ${this.name}: `, error);
         }
     }
 

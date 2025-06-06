@@ -1,6 +1,6 @@
 import {Monitor} from "./core/Monitor";
 import {WebEyeConfig} from "./types";
-import {LoggerPlugin} from "./plugins/LoggerPlugin";
+import {ConsolePlugin} from "./plugins/ConsolePlugin";
 import {RequestPlugin} from "./plugins/RequestPlugin";
 import {ResourcePlugin} from "./plugins/ResourcePlugin";
 import {ErrorPlugin} from "./plugins/ErrorPlugin";
@@ -13,7 +13,7 @@ export function initEyeLogs(options: WebEyeConfig): Monitor {
     const monitor = new Monitor(options);
 
     monitor
-        .use(new LoggerPlugin())
+        .use(new ConsolePlugin())
         .use(new WhiteScreenPlugin({
             checkDOMCount: false,
             skipSelectors: ["meta", "head", "script", "style"], // 忽略的元素选择器(checkDOMCount 为 true 时生效)

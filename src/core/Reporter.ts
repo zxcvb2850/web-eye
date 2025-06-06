@@ -211,8 +211,7 @@ export class Reporter implements IReporter {
                 // 这里只发送精简的数据
                 const simplifiedData = data.map(item => ({
                     type: item.type,
-                    timestamp: item.timestamp,
-                    // 只保留关键字段，避免URL过长
+                    data: safeJsonStringify(item.data),
                 }));
 
                 const params = new URLSearchParams({

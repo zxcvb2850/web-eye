@@ -1,5 +1,4 @@
 import { Plugin } from "../core/Plugin";
-import { LoggerPlugin } from "./LoggerPlugin";
 import { debounce, isSupported } from "../utils/common";
 import { MonitorType } from "../types";
 
@@ -11,7 +10,6 @@ interface DetectionResult {
         domCount: number;
         textNodes: number;
         imageNodes: number;
-        colorSamples: Array<{ x: number; y: number; color: string }>;
         timestamp: number;
     };
 }
@@ -59,7 +57,6 @@ export class WhiteScreenPlugin extends Plugin {
     private lastDetectionTime = 0;
     private whiteScreenStartTime = 0;
     private hasReported = false;
-    private logger: any;
 
     constructor(config?: Partial<WhiteScreenConfig>) {
         super();
@@ -67,10 +64,6 @@ export class WhiteScreenPlugin extends Plugin {
     }
 
     protected init(): void {
-        // 获取Logger实例
-        const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
-        this.logger = loggerPlugin?.getLogger() || console;
-
         this.logger.log('Init WhiteScreenPlugin');
 
         // 等待页面基本加载完成后开始检测
@@ -195,7 +188,6 @@ export class WhiteScreenPlugin extends Plugin {
                 domCount: 0,
                 textNodes: 0,
                 imageNodes: 0,
-                colorSamples: [],
                 timestamp: now,
             },
         }

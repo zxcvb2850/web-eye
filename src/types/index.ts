@@ -14,8 +14,10 @@ export interface Callback {
 
 // 监控配置接口
 export interface WebEyeConfig  {
-    appId: string;
+    debug?: boolean;
+    appKey: string;
     reportUrl: string;
+    logLevel: LogLevel;
     maxRetry?: number; // 上报异常，最大重试次数
     retryDelay?: number; // 上报异常，重试间隔
     enableHash?: boolean;
@@ -24,20 +26,24 @@ export interface WebEyeConfig  {
     performanceThreshold?: number;
     enableAutoReport?: boolean; // 是否定时上报
     batchSize?: number;
-    flushInterval?: number;
+    flushInterval?: number; // 定时上报间隔
+    extends?: ExtendInfo; // 扩展信息
 }
 
 // 基础监控数据接口
 export interface BaseMonitorData {
-    id: string;
-    type: MonitorType;
-    timestamp: number;
-    url: string;
-    userAgent: string;
-    appId: string;
-    sessionId: string;
-    deviceInfo: DeviceInfo;
-    userId?: string;
+    appKey: string; // 上报KEY
+    type: MonitorType; // 错误类型
+    visitorId: string; // 指纹ID
+    sessionId: string; // 会话ID
+    data: IAnyObject; // 所上报的数据
+    deviceInfo: DeviceInfo; // 设备信息
+    extends: ExtendInfo; // 拓展信息
+}
+
+// 扩展信息接口
+export interface ExtendInfo {
+    [key: string]: any;
 }
 
 //  监控数据类型枚举
@@ -56,6 +62,7 @@ export enum MonitorType {
 
 // 设备信息接口
 export interface DeviceInfo {
+    url: string;
     userAgent: string;
     language: string;
     platform: string;
@@ -67,6 +74,7 @@ export interface DeviceInfo {
         width: number;
         height: number;
     };
+    timestamp: number;
     connection?: NetworkInfo | null;
 }
 
@@ -131,6 +139,25 @@ export interface IPlugin {
 export interface IReporter {
     report(data: BaseMonitorData | BaseMonitorData[]): Promise<void>;
     flush(): Promise<void>;
+}
+
+/**
+ * 日志等级枚举
+ */
+export enum LogLevel {
+    DEBUG = 0,
+    LOG = 1,
+    WARN = 2,
+    ERROR = 3,
+    SILENT = 4, // 不输出任何日志
+}
+
+// 日志打印接口
+export interface ILogger {
+    log(...args: any[]): void;
+    warn(...args: any[]): void;
+    error(...args: any[]): void;
+    debug(...args: any[]): void;
 }
 
 // 监控数据联合类型

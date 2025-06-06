@@ -1,4 +1,29 @@
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import {NetworkInfo} from "../types";
+
+/**
+ * 获取浏览器指纹
+ * */
+export async function getFingerprint(): Promise<string> {
+    let visitorId = localStorage.getItem('_eye_visitor_id_');
+    try {
+        if (!visitorId) {
+            const fp = await FingerprintJS.load()
+            const result = await fp.get();
+            if (result?.visitorId) {
+                visitorId = result.visitorId
+            } else {
+                visitorId = getUuid();
+            }
+        }
+        return visitorId;
+    } catch {
+        visitorId = getUuid();
+        return visitorId;
+    } finally {
+        visitorId && localStorage.setItem('_eye_visitor_id_', visitorId);
+    }
+}
 
 /**
  * 生成唯一ID
@@ -8,13 +33,36 @@ export function generateId(): string {
 }
 
 /**
+ * 生成 UUID
+ * */
+export const getUuid = (): string => {
+    let timestamp = new Date().getTime();
+    let performNow =
+        (typeof performance !== 'undefined' &&
+            performance.now &&
+            performance.now() * 1000) ||
+        0;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        let random = Math.random() * 16;
+        if (timestamp > 0) {
+            random = (timestamp + random) % 16 | 0;
+            timestamp = Math.floor(timestamp / 16);
+        } else {
+            random = (performNow + random) % 16 | 0;
+            performNow = Math.floor(performNow / 16);
+        }
+        return (c === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+    });
+};
+
+/**
  * 生成会话ID
  */
 export function generateSessionId(): string {
-    let sessionId = sessionStorage.getItem('monitor_session_id');
+    let sessionId = sessionStorage.getItem('_eye_session_id_');
     if (!sessionId) {
         sessionId = generateId();
-        sessionStorage.setItem('monitor_session_id', sessionId);
+        sessionStorage.setItem('_eye_session_id_', sessionId);
     }
     return sessionId;
 }

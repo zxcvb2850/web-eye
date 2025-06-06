@@ -8,11 +8,13 @@ export function getDeviceInfo(): DeviceInfo {
     const { innerWidth, innerHeight, screen } = window;
 
     return {
+        url: window.location.href,
         userAgent: navigator.userAgent,
         language: navigator.language,
         platform: navigator.platform,
         screen: {width: screen.width, height: screen.height},
         viewport: { width: innerWidth, height: innerHeight },
+        timestamp: Date.now(),
         connection: getNetworkInfo(),
     }
 }

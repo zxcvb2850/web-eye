@@ -14,39 +14,39 @@ export enum LogLevel {
  * 日志记录接口
  */
 interface LogRecord {
-    id: string;
     level: LogLevel;
     levelName: string;
     message: string;
     args: any[];
     stack?: string;
     timestamp: number;
-    isInternal?: boolean;
 }
 
 /**
  * Logger插件配置接口
  */
-interface LoggerConfig {
+interface ConsoleConfig {
     logLevel: LogLevel;
     maxRecords: number;
     dbName: string;
     storeName: string;
     enableStackTrace: boolean;
+    ignorePatterns: (RegExp|string)[]; // 忽略日志的正则表达式
 }
 
 /**
  * 日志监控插件
  */
-export class LoggerPlugin extends Plugin {
-    name = 'LoggerPlugin';
+export class ConsolePlugin extends Plugin {
+    name = 'ConsolePlugin';
 
-    private config: LoggerConfig = {
+    private config: ConsoleConfig = {
         logLevel: LogLevel.DEBUG,
         maxRecords: 100,
         dbName: 'WebEyeLogger',
         storeName: 'logs',
         enableStackTrace: true,
+        ignorePatterns: [/\[WebEyeLog\]/],
     };
 
     private isReporting: boolean = false; // 上报标记
@@ -58,27 +58,7 @@ export class LoggerPlugin extends Plugin {
         debug: typeof console.debug;
     };
 
-    // 内部Logger，不会被拦截
-    private internalLogger = {
-        log: console.log.bind(console),
-        warn: console.warn.bind(console),
-        error: console.error.bind(console),
-        debug: console.debug.bind(console),
-        info: console.info.bind(console),
-    };
-
-    // 标记，用于识别SDK内部调用
-    private isInternalCall = false;
-
-    // 对外提供的 Logger 接口，其他插件可以使用
-    public logger = {
-        debug: (...args: any[]) => this.internalLog(LogLevel.DEBUG, 'debug', args),
-        log: (...args: any[]) => this.internalLog(LogLevel.LOG, 'log', args),
-        warn: (...args: any[]) => this.internalLog(LogLevel.WARN, 'warn', args),
-        error: (...args: any[]) => this.internalLog(LogLevel.ERROR, 'error', args),
-    }
-
-    constructor(config?: Partial<LoggerConfig>) {
+    constructor(config?: Partial<ConsoleConfig>) {
         super();
         this.config = { ...this.config, ...config };
 
@@ -92,13 +72,13 @@ export class LoggerPlugin extends Plugin {
     }
 
     protected async init(): Promise<void> {
-        this.internalLogger.info(`Init LoggerPlugin`);
+        this.logger.log(`Init LoggerPlugin`);
 
         try {
             await this.initIndexedDB();
             this.hijackConsole();
         } catch (error) {
-            this.internalLogger.error("Failed to initialize LoggerPlugin:", error);
+            this.logger.error("Failed to initialize ConsolePlugin:", error);
         }
     }
 
@@ -128,7 +108,7 @@ export class LoggerPlugin extends Plugin {
 
                 if (!db.objectStoreNames.contains(this.config.storeName)) {
                     const store = db.createObjectStore(this.config.storeName, {
-                        keyPath: 'id',
+                        keyPath: 'timestamp',
                         autoIncrement: false,
                     });
                     store.createIndex('timestamp', 'timestamp', { unique: false });
@@ -136,14 +116,6 @@ export class LoggerPlugin extends Plugin {
                 }
             };
         });
-    }
-
-    /**
-     * SDK内部使用的日志方法
-     */
-    private internalLog(level: LogLevel, levelName: string, args: any[]): void {
-        // 先输出到控制台
-        this.internalLogger[levelName as keyof typeof this.internalLogger](...args);
     }
 
     /**
@@ -169,13 +141,27 @@ export class LoggerPlugin extends Plugin {
                 originalMethod.apply(console, args);
 
                 // 检查是否为SDK内部调用或info调用
-                if (this.isInternalCall || method === 'info') {
+                if (method === 'info' || this.shouldIgnoreLog(args)) {
                     return;
                 }
 
                 // 记录日志
-                this.recordLog(level, method, args);
+                this.recordConsoleLog(level, method, args);
             };
+        });
+    }
+
+    /**
+     * 检查是否应该忽略这条日志
+     */
+    private shouldIgnoreLog(args: any[]): boolean {
+        const message = this.formatMessage(args);
+
+        return this.config.ignorePatterns.some(pattern => {
+            if (pattern instanceof RegExp) {
+                return pattern.test(message);
+            }
+            return pattern === message;
         });
     }
 
@@ -191,12 +177,11 @@ export class LoggerPlugin extends Plugin {
     /**
      * 记录日志到IndexedDB
      */
-    private async recordLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
+    private async recordConsoleLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
         if (!this.db) return;
 
         try {
             const logRecord: LogRecord = {
-                id: this.generateId(),
                 timestamp: Date.now(),
                 level,
                 levelName: levelName.toUpperCase(),
@@ -218,7 +203,7 @@ export class LoggerPlugin extends Plugin {
                 await this.reportAndClearLogs();
             }
         } catch (error) {
-            this.internalLogger.error("Failed to record log:", error);
+            this.logger.error("Failed to record log:", error);
         }
     }
 
@@ -404,7 +389,7 @@ export class LoggerPlugin extends Plugin {
      */
     private async reportAndClearLogs(): Promise<void> {
         try {
-            this.internalLogger.info("Starting to report logs");
+            this.logger.log("Starting to report logs");
 
             const logs = await this.getAllLogs();
             if (logs.length === 0) return;
@@ -422,9 +407,9 @@ export class LoggerPlugin extends Plugin {
             // 清空本地数据
             await this.clearLogs();
 
-            this.internalLogger.info(`Reported and cleared ${logs.length} log records`);
+            this.logger.log(`Reported and cleared ${logs.length} log records`);
         } catch (error) {
-            this.internalLogger.error("Failed to report logs:", error);
+            this.logger.error("Failed to report logs:", error);
         } finally {
             this.isReporting = false;
         }
@@ -441,20 +426,13 @@ export class LoggerPlugin extends Plugin {
     }
 
     /**
-     * 生成唯一ID
-     */
-    private generateId(): string {
-        return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    }
-
-    /**
      * 手动上报日志
      */
     async manualReport(): Promise<void> {
         try {
             await this.reportAndClearLogs();
         } catch (error) {
-            this.internalLogger.error("Manual report failed:", error);
+            this.logger.error("Manual report failed:", error);
         }
     }
 
@@ -463,7 +441,7 @@ export class LoggerPlugin extends Plugin {
      */
     setLogLevel(level: LogLevel): void {
         this.config.logLevel = level;
-        this.internalLogger.info(`Log level set to ${LogLevel[level]}`);
+        this.logger.log(`Log level set to ${LogLevel[level]}`);
     }
 
     /**
@@ -479,9 +457,9 @@ export class LoggerPlugin extends Plugin {
     async clearAllLogs(): Promise<void> {
         try {
             await this.clearLogs();
-            this.internalLogger.info("All logs cleared");
+            this.logger.log("All logs cleared");
         } catch (error) {
-            this.internalLogger.error("Clear logs failed:", error);
+            this.logger.error("Clear logs failed:", error);
         }
     }
 

@@ -1,6 +1,5 @@
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
-import { LoggerPlugin } from "./LoggerPlugin";
 import {generateId} from "../utils/common";
 import { record } from 'rrweb';
 
@@ -28,7 +27,7 @@ interface RecordEvent {
 interface RecordSession {
     id: string;
     triggerType: RecordTriggerType;
-    triggerData?: any; // 触发相关数据(如错误信息)
+    relatedId?: string; // 触发错误的ID
     startTime: number;
     endTime?: number;
     events: RecordEvent[];
@@ -157,7 +156,6 @@ export class RecordPlugin extends Plugin {
         cleanupThreshold: 0.8 // 80%时清理
     };
 
-    private logger: any;
     private stopRecording: ReturnType<typeof record> | null = null;
     private eventBuffer: CircularBuffer<RecordEvent>;
     private activeSessions: Map<string, RecordSession> = new Map();
@@ -184,9 +182,6 @@ export class RecordPlugin extends Plugin {
     }
 
     protected init(): void {
-        const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
-        this.logger = loggerPlugin?.getLogger() || console;
-
         this.logger.log('Init RecordPlugin');
 
         // 初始化存储大小统计
@@ -277,22 +272,22 @@ export class RecordPlugin extends Plugin {
     /**
      * 自定义触发录制
      */
-    public customTrigger(triggerData?: any): string | null {
-        return this.startSession(RecordTriggerType.CUSTOM, triggerData);
+    public customTrigger(errorId?: string): string | null {
+        return this.startSession(RecordTriggerType.CUSTOM, errorId);
     }
 
     /**
      * 错误触发录制
      */
-    public errorTrigger(errorData: any): string | null {
-        this.logger.log('Error triggered recording:', errorData);
+    public errorTrigger(errorId: string): string | null {
+        this.logger.log('Error triggered recording:', errorId);
 
         // 延迟触发，给错误处理一些时间
-        const sessionId = this.startSession(RecordTriggerType.ERROR, errorData, errorData.errorId);
+        const sessionId = this.startSession(RecordTriggerType.ERROR, errorId);
 
         // 建立错误ID与录制会话ID的映射
-        if (sessionId && errorData.errorId) {
-            this.errorSessionMap.set(errorData.errorId, sessionId);
+        if (sessionId && errorId) {
+            this.errorSessionMap.set(errorId, sessionId);
         }
 
         return sessionId;
@@ -301,7 +296,7 @@ export class RecordPlugin extends Plugin {
     /**
      * 开始录制会话
      */
-    private startSession(triggerType: RecordTriggerType, triggerData?: any, errorId?: string): string | null {
+    private startSession(triggerType: RecordTriggerType, relatedId?: string): string | null {
         try {
             const sessionId = generateId();
 
@@ -309,7 +304,7 @@ export class RecordPlugin extends Plugin {
             const session: RecordSession = {
                 id: sessionId,
                 triggerType,
-                triggerData,
+                relatedId,
                 startTime: Date.now(),
                 events: [],
                 status: 'recording'
@@ -410,7 +405,7 @@ export class RecordPlugin extends Plugin {
             const reportData = {
                 sessionId: session.id,
                 triggerType: session.triggerType,
-                triggerData: session.triggerData,
+                relatedId: session.relatedId,
                 events: data,
                 timestamp: Date.now()
             };

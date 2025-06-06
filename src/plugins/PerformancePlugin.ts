@@ -3,17 +3,12 @@
  * */
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
-import { LoggerPlugin } from "./LoggerPlugin";
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 
 export class PerformancePlugin extends Plugin {
     name = 'PerformancePlugin';
-    private logger: any
 
     protected init(): void {
-        const loggerPlugin = this.monitor.getPlugin("LoggerPlugin") as LoggerPlugin;
-        this.logger = loggerPlugin?.getLogger() || console;
-
         this.logger.log('Init PerformancePlugin');
 
         this.collectLCP();

@@ -13,7 +13,7 @@ export class RequestPlugin extends Plugin {
     private originalXHRSend!: typeof XMLHttpRequest.prototype.send;
 
     protected init(): void {
-        console.info("Init RequestPlugin");
+        this.logger.log("Init RequestPlugin");
 
         this.originalFetch = window.fetch;
         this.originalXHROpen = XMLHttpRequest.prototype.open;
@@ -80,8 +80,6 @@ export class RequestPlugin extends Plugin {
                             }
                         };
                         _this.report(requestData);
-
-                        console.info("requestData =====>", requestData);
                     })
                 }
 
@@ -167,8 +165,6 @@ export class RequestPlugin extends Plugin {
                                 }
                             }
                             _this.report(requestData);
-
-                            console.info("XHR requestData =====>", requestData);
                         })
                     }
 
@@ -358,7 +354,7 @@ export class RequestPlugin extends Plugin {
             }
             return params;
         } catch (error) {
-            console.error("XHR Get Params ====>", error);
+            this.logger.error("XHR Get Params ====>", error);
             return undefined;
         }
     }

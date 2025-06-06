@@ -1,5 +1,4 @@
 import { Plugin } from "../core/Plugin";
-import { LoggerPlugin } from "./LoggerPlugin";
 import { generateId, throttle } from "../utils/common";
 import { MonitorType } from "../types";
 import { RecordPlugin } from "./RecordPlugin";
@@ -79,7 +78,6 @@ export class ErrorPlugin extends Plugin {
 
     private behaviorQueue: UserAction[] = [];
     private pendingErrors: Map<string, { error: ErrorInfo; timer: NodeJS.Timeout }> = new Map();
-    private logger: any;
     private recordPlugin: RecordPlugin | null = null;
 
     constructor(config?: Partial<ErrorConfig>) {
@@ -88,10 +86,6 @@ export class ErrorPlugin extends Plugin {
     }
 
     protected init(): void {
-        // 获取Logger实例
-        const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
-        this.logger = loggerPlugin?.getLogger() || console;
-
         // 获取RecordPlugin实例
         this.recordPlugin = this.monitor.getPlugin('RecordPlugin') as RecordPlugin;
 
@@ -192,12 +186,7 @@ export class ErrorPlugin extends Plugin {
 
         // 触发录制（如果启用）
         if (this.config.enableRecordTrigger && this.recordPlugin) {
-            const recordSessionId = this.recordPlugin.errorTrigger({
-                errorId: errorInfo.id,
-                type: errorInfo.type,
-                message: errorInfo.message,
-                timestamp: errorInfo.timestamp
-            });
+            const recordSessionId = this.recordPlugin.errorTrigger(errorInfo.id);
 
             // 将录制会话ID关联到错误信息
             if (recordSessionId) {

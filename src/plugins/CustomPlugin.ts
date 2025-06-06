@@ -1,5 +1,4 @@
 import {Plugin} from "../core/Plugin";
-import {LoggerPlugin} from "./LoggerPlugin";
 import {ErrorPlugin} from "./ErrorPlugin";
 import {generateId, safeJsonStringify} from "../utils/common";
 import {MonitorType} from "../types";
@@ -29,7 +28,6 @@ interface CustomReportConfig {
  * */
 export class CustomPlugin extends Plugin {
     name = "CustomPlugin";
-    private logger: any;
     private errorPlugin: ErrorPlugin | null = null;
     private recordPlugin: RecordPlugin | null = null;
 
@@ -45,16 +43,13 @@ export class CustomPlugin extends Plugin {
 
 
     protected init(): void{
-        const loggerPlugin = this.monitor.getPlugin('LoggerPlugin') as LoggerPlugin;
-        this.logger = loggerPlugin?.getLogger() || console;
-
         // 获取 ErrorPlugin 实例（用于获取行为数据）
         this.errorPlugin = this.monitor.getPlugin("ErrorPlugin") as ErrorPlugin;
 
         // 获取 RecordPlugin 实例
         this.recordPlugin = this.monitor.getPlugin("RecordPlugin") as RecordPlugin;
 
-        this.logger.log("Init CustomPlugin");
+        this.logger.log('Init CustomPlugin')
     }
 
     protected destroy(): void{
@@ -119,7 +114,7 @@ export class CustomPlugin extends Plugin {
         // 上报用户录制
         if (options.reportRecord && this.recordPlugin) {
             try {
-                this.recordPlugin.errorTrigger({errorId: reportId});
+                this.recordPlugin.customTrigger(reportId);
             } catch (error) {
                 this.logger.warn(`Add user record failed ====>`, error);
             }

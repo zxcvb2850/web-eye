@@ -1,6 +1,7 @@
 import {BaseMonitorData, IPlugin, MonitorData, WebEyeConfig} from "../types";
 import {Reporter} from "./Reporter";
-import {generateId, generateSessionId} from "../utils/common";
+import {Logger} from "./Logger";
+import {generateSessionId, getFingerprint} from "../utils/common";
 import {getDeviceInfo} from "../utils/device";
 
 /**
@@ -8,15 +9,25 @@ import {getDeviceInfo} from "../utils/device";
  * */
 export class Monitor {
     private config: WebEyeConfig;
+    private logger: Logger;
     private reporter: Reporter;
     private plugins: Map<string, IPlugin> = new Map();
+    private visitorId: string | null = null;
     private sessionId: string;
     private installed = false;
 
     constructor(config: WebEyeConfig) {
         this.config = this.mergeConfig(config);
         this.sessionId = generateSessionId();
+        this.logger = new Logger(this.config);
         this.reporter = new Reporter(this.config);
+
+        this.init();
+    }
+
+    private async init() {
+        // 获取指纹
+        this.visitorId = await getFingerprint();
     }
 
     /**
@@ -42,7 +53,7 @@ export class Monitor {
      * */
     install(): Monitor {
         if (this.installed) {
-            console.warn('Monitor is already installed');
+            this.logger.warn('Monitor is already installed');
             return this;
         }
 
@@ -53,7 +64,7 @@ export class Monitor {
             plugin.install(this);
         })
 
-        console.info('Monitor installed successfully');
+        this.logger.log('Monitor installed successfully');
         return this;
     }
 
@@ -62,7 +73,7 @@ export class Monitor {
      * */
     uninstall(): void {
         if (!this.installed) {
-            console.warn('Monitor is not installed');
+            this.logger.warn('Monitor is not installed');
             return;
         }
 
@@ -75,7 +86,7 @@ export class Monitor {
         this.reporter.destroy();
 
         this.installed = false;
-        console.info('Monitor uninstalled successfully');
+        this.logger.log('Monitor uninstalled successfully');
     }
 
     /**
@@ -83,7 +94,7 @@ export class Monitor {
      * */
     use(plugin: IPlugin): Monitor {
         if (this.plugins.has(plugin.name)) {
-            console.warn(`Plugin ${plugin.name} is already registered.`);
+            this.logger.warn(`Plugin ${plugin.name} is already registered.`);
             return this;
         }
 
@@ -122,7 +133,7 @@ export class Monitor {
      * */
     async report(data: Partial<MonitorData>): Promise<void> {
         if (!this.installed) {
-            console.warn(`Monitor is not installed.`);
+            this.logger.warn(`Monitor is not installed.`);
             return;
         }
 
@@ -135,12 +146,11 @@ export class Monitor {
      * */
     private createMonitorData(data: Partial<MonitorData>): BaseMonitorData {
         return {
-            appId: this.config.appId,
-            id: generateId(),
-            timestamp: Date.now(),
-            url: window.location.href,
+            appKey: this.config.appKey,
+            visitorId: this.visitorId || this.sessionId,
             sessionId: this.sessionId,
             deviceInfo: getDeviceInfo(),
+            extends: this.config.extends,
             ...data,
         } as BaseMonitorData;
     }
@@ -164,6 +174,16 @@ export class Monitor {
      * */
     updateConfig(config: Partial<WebEyeConfig>): void {
         this.config = {...this.config, ...config};
+    }
+
+    /**
+     * 更新拓展信息
+     * */
+    updateConfigExtends(key: string, value: number | string | boolean) {
+        if (!this.config?.extends) {
+            this.config.extends = {};
+        }
+        this.config.extends[key] = value;
     }
 
     /**
