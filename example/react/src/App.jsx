@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import rrwebPlayer from 'rrweb-player';
@@ -10,7 +10,17 @@ function App() {
   const [count, setCount] = useState(0)
     const [obj] = useState({a: 1, b: {c: 2}})
 
+    useEffect(() => {
+        window.monitor.updateConfigExtends("source", 1);
+    }, [])
+
     const handleClick = () => {
+      window.monitor.updateConfig({
+        extend: {
+          uid: "1213",
+        }
+      })
+
         /*const obj = {a: 1, b: {c: 2}};
         console.info("a: ", obj.a)
         console.info("b: ", obj.b)
@@ -36,6 +46,7 @@ function App() {
         });
     }
 
+    return null;
   return (
     <div className={count > 3 ? "white" : ""}>
         {count < 6 && <button onClick={() => setCount((count) => count + 1)}>

@@ -4,7 +4,7 @@ import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from "./components/ErrorBoundary/index.js";
 import {Monitor} from '../../../src/core/Monitor';
-import {LoggerPlugin} from "../../../src/plugins/LoggerPlugin.js";
+import {ConsolePlugin} from "../../../src/plugins/ConsolePlugin.ts";
 import {RequestPlugin} from "../../../src/plugins/RequestPlugin.js";
 import {ResourcePlugin} from "../../../src/plugins/ResourcePlugin.js";
 import {CustomPlugin} from "../../../src/plugins/CustomPlugin.ts";
@@ -14,10 +14,15 @@ import {PerformancePlugin} from "../../../src/plugins/PerformancePlugin.js";
 import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
 
 const monitor = new Monitor({
-    appId: "y",
-    reportUrl: "http://localhost:8080/api/v1",
+    debug: true,
+    appKey: "y",
+    reportUrl: "http://localhost:8989/report/v1",
+    extends: {
+        uid: "1111",
+        channelId: "10000",
+    }
 })
-const loggerPlugin = new LoggerPlugin({
+const consolePlugin = new ConsolePlugin({
     maxRecords: 20,
 });
 const whiteScreenPlugin = new WhiteScreenPlugin({
@@ -32,7 +37,7 @@ window.errorPlugin = new ErrorPlugin();
 window.recordPlugin = new RecordPlugin();
 
 monitor
-    .use(loggerPlugin)
+    .use(consolePlugin)
     .use(whiteScreenPlugin)
     .use(performancePlugin)
     .use(customReportPlugin)
@@ -41,6 +46,8 @@ monitor
     .use(errorPlugin)
     .use(recordPlugin)
     .install();
+
+window.monitor = monitor;
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
