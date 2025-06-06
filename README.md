@@ -48,7 +48,8 @@
 > 自定义上报 custom
 ```javascript
 {
-    "reportId": string, // 上报ID
+    "event": string, // 自定义key
+    "reportId": string, // 上报ID 用于录屏关联
     "content": {
         "__type": string,
         "value": string,

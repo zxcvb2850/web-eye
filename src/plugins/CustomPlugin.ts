@@ -59,8 +59,11 @@ export class CustomPlugin extends Plugin {
     /**
      * 自定义上报
      * */
-    public customReport(data: CustomReportData, options: ReportOptions = {}): { success: boolean; reportId: string | null } {
+    public customReport(event: string, data: CustomReportData, options: ReportOptions = {}): { success: boolean; reportId: string | null } {
         try {
+            if (!event) {
+                throw new Error("Custom report event is required");
+            }
             const reportId = data?.id || generateId();
 
             const content = this.serializeContent(data);
@@ -69,17 +72,13 @@ export class CustomPlugin extends Plugin {
             this.report({
                 type: MonitorType.CUSTOM,
                 data: {
+                    event: event.toString(),
                     reportId,
                     ...reportOtherData,
                     content,
                     timestamp: Date.now(),
                 }
             })
-
-            this.logger.log(`Custom report success ====>`, {
-                reportId,
-                payload: {...reportOtherData, content},
-            });
 
             return {
                 success: true,
