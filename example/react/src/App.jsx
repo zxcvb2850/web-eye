@@ -31,7 +31,7 @@ function App() {
         // console.log("click react")
         // fetch("http://localhost:8080/test");
 
-        window.customReportPlugin.customReport(new Date(), {
+        window.customReportPlugin.customReport("test_custom", new Date(), {
             includeBehavior: true,
             reportRecord: true,
         })
