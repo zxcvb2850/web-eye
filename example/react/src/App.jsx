@@ -46,7 +46,7 @@ function App() {
         });
     }
 
-    return null;
+//    return null;
   return (
     <div className={count > 3 ? "white" : ""}>
         {count < 6 && <button onClick={() => setCount((count) => count + 1)}>

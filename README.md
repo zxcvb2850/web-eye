@@ -155,3 +155,23 @@
     "timestamp": number,
 }
 ```
+
+> 行为上报 behavior
+```javascript
+[
+    {
+        type: string, // 行为类型 click|scroll|hashchange
+        target?: string, // DOM 类型
+        timestamp: number,
+        data?: {
+            tagName?: string, // 节点名称
+            className?: string, // classname
+            innerText?: string, // 内容
+            hash?: string,
+            href?: string，
+            scrollY?: number,
+            scrollX?: number
+        },
+    }
+]
+```
