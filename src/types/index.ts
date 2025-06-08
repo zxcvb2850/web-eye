@@ -58,6 +58,7 @@ export enum MonitorType {
     RESOURCE = 'resource',
     CODE = 'code',
     CUSTOM = 'custom',
+    CONSOLE = 'console',
 }
 
 // 设备信息接口

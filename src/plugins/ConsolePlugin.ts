@@ -1,4 +1,5 @@
 import { Plugin } from "../core/Plugin";
+import { MonitorType } from "../types";
 
 /**
  * 日志等级枚举
@@ -396,7 +397,7 @@ export class ConsolePlugin extends Plugin {
 
             // 上报数据
             await this.report({
-                type: 'logger',
+                type: MonitorType.CONSOLE,
                 data: {
                     logs,
                     count: logs.length,

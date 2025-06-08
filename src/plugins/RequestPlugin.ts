@@ -69,7 +69,7 @@ export class RequestPlugin extends Plugin {
                     const duration = endTime - startTime;
 
                     _this.safeExecute(() => {
-                        const requestData: Partial<RequestData> = {
+                        _this.report({
                             type: MonitorType.REQUEST,
                             data: {
                                 url, method, duration, success, errorMessage, isCorsError,
@@ -79,8 +79,7 @@ export class RequestPlugin extends Plugin {
                                 requestParams: _this.getRequestParams(input, init),
                                 timestamp: Date.now(),
                             }
-                        };
-                        _this.report(requestData);
+                        });
                     })
                 }
 
@@ -153,7 +152,7 @@ export class RequestPlugin extends Plugin {
                         }
 
                         _this.safeExecute(() => {
-                            const requestData: Partial<RequestData> = {
+                            _this.report({
                                 type: MonitorType.REQUEST,
                                 data: {
                                     url: _webEyeData_.url,
@@ -165,8 +164,7 @@ export class RequestPlugin extends Plugin {
                                     requestParams: _webEyeData_.requestParams,
                                     timestamp: Date.now(),
                                 }
-                            }
-                            _this.report(requestData);
+                            });
                         })
                     }
 

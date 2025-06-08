@@ -448,7 +448,7 @@ export class ErrorPlugin extends Plugin {
     private async reportError(errorInfo: ErrorInfo): Promise<void> {
         const behaviorData = [...this.behaviorQueue];
 
-        const data: Record<string, any> = { error: errorInfo };
+        const data: Record<string, any> = { error: errorInfo, timestamp: Date.now() };
         if (behaviorData?.length) {
             data.behaviors = behaviorData;
         }
