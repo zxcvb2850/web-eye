@@ -3,6 +3,11 @@ import {MonitorType, RequestData} from "../types";
 import {replaceOriginal} from "../utils/helpers";
 import {safeJsonParse} from "../utils/common";
 
+interface RequestConfig {
+    filterUrlWhite?: (string|RegExp)[], // 过滤域名白名单
+    filterHeadersWhite?: (string|RegExp)[], // 过滤请求头白名单
+}
+
 /**
  * 请求监控插件
  * */
@@ -11,6 +16,17 @@ export class RequestPlugin extends Plugin {
     private originalFetch!: typeof fetch;
     private originalXHROpen!: typeof XMLHttpRequest.prototype.open;
     private originalXHRSend!: typeof XMLHttpRequest.prototype.send;
+
+    private config: RequestConfig = {
+        filterUrlWhite: [],
+        filterHeadersWhite: [],
+    }
+
+    constructor(config?: Partial<RequestConfig>) {
+        super();
+
+        this.config = {...this.config, ...config}
+    }
 
     protected init(): void {
         this.logger.log("Init RequestPlugin");
@@ -61,12 +77,10 @@ export class RequestPlugin extends Plugin {
                     }
                 } catch (error) {
                     success = false;
-                    isCorsError = _this.isFetchCorsError(error, url);
-                    errorMessage = error instanceof Error ? error.message : `Fetch Error`;
-                    throw error;
-                } finally {
                     const endTime = Date.now();
                     const duration = endTime - startTime;
+                    isCorsError = _this.isFetchCorsError(error, url);
+                    errorMessage = error instanceof Error ? error.message : `Fetch Error`;
 
                     _this.safeExecute(() => {
                         _this.report({
@@ -81,6 +95,10 @@ export class RequestPlugin extends Plugin {
                             }
                         });
                     })
+
+                    throw error;
+                } finally {
+
                 }
 
                 return response;
@@ -149,23 +167,23 @@ export class RequestPlugin extends Plugin {
                             } else {
                                 errorMessage = `HTTP Error: ${this.status} ${this.statusText}`;
                             }
-                        }
 
-                        _this.safeExecute(() => {
-                            _this.report({
-                                type: MonitorType.REQUEST,
-                                data: {
-                                    url: _webEyeData_.url,
-                                    method: _webEyeData_.method,
-                                    duration, success, errorMessage, isCorsError,
-                                    status: this.status,
-                                    requestHeaders: _webEyeData_.requestHeaders,
-                                    responseHeaders: _this.getXHRResponseHeaders(this),
-                                    requestParams: _webEyeData_.requestParams,
-                                    timestamp: Date.now(),
-                                }
-                            });
-                        })
+                            _this.safeExecute(() => {
+                                _this.report({
+                                    type: MonitorType.REQUEST,
+                                    data: {
+                                        url: _webEyeData_.url,
+                                        method: _webEyeData_.method,
+                                        duration, success, errorMessage, isCorsError,
+                                        status: this.status,
+                                        requestHeaders: _webEyeData_.requestHeaders,
+                                        responseHeaders: _this.getXHRResponseHeaders(this),
+                                        requestParams: _webEyeData_.requestParams,
+                                        timestamp: Date.now(),
+                                    }
+                                });
+                            })
+                        }
                     }
 
                     // 调用原始的 onreadystatechange
@@ -189,15 +207,30 @@ export class RequestPlugin extends Plugin {
 
         if (headers instanceof Headers) {
             headers.forEach((value, key) => {
-                result[key] = value;
+                if (
+                    !(this.config?.filterHeadersWhite?.length &&
+                    !this.filterWhiteList(this.config.filterHeadersWhite, key))
+                ) {
+                    result[key] = value;
+                }
             });
         } else if (Array.isArray(headers)) {
             headers.forEach(([key, value]) => {
-                result[key] = value;
+                if (
+                    !(this.config?.filterHeadersWhite?.length &&
+                        !this.filterWhiteList(this.config.filterHeadersWhite, key))
+                ) {
+                    result[key] = value;
+                }
             })
         } else {
             Object.entries(headers).forEach(([key, value]) => {
-                result[key] = value;
+                if (
+                    !(this.config?.filterHeadersWhite?.length &&
+                        !this.filterWhiteList(this.config.filterHeadersWhite, key))
+                ) {
+                    result[key] = value;
+                }
             })
         }
 
@@ -306,7 +339,11 @@ export class RequestPlugin extends Plugin {
 
             headers.forEach(header => {
                 const [key, ...valueParts] = header.split(': ');
-                if (key && valueParts.length > 0) {
+                if (
+                    key &&
+                    valueParts.length > 0 &&
+                    (this.config?.filterHeadersWhite?.length && this.filterWhiteList(this.config.filterHeadersWhite, key))
+                ) {
                     result[key.toLowerCase()] = valueParts.join(': ');
                 }
             });
@@ -395,10 +432,14 @@ export class RequestPlugin extends Plugin {
      * 检查是否应该监控此请求
      * */
     private shouldMonitorRequest(url: string, headers: HeadersInit | string | undefined): boolean {
+        // 过滤掉 SDK 请求（Header 中有 EyeLogTag）
         if (headers && typeof headers === 'object' && 'EyeLogTag' in headers) return false;
+        // 过滤掉上报接口的域名，避免无限循环
+        if (url.includes(this.monitor.getConfig().reportUrl)) return false;
+        // 过滤配置中的域名
+        if (this.config?.filterUrlWhite?.length) return this.filterWhiteList(this.config.filterUrlWhite, url);
 
-        // 过滤掉上报接口的请求，避免无限循环
-        return !url.includes(this.monitor.getConfig().reportUrl);
+        return true;
     }
 
     /**
@@ -419,6 +460,18 @@ export class RequestPlugin extends Plugin {
         })
 
         return result
+    }
+
+    /**
+     * 白名单过滤
+     * */
+    private filterWhiteList(filters: (string|RegExp)[], value: string): boolean {
+        if (!filters.length) return true;
+        for (const white of filters) {
+            if (typeof white === 'string' && value.includes(white)) return false;
+            if (white instanceof RegExp && white.test(value)) return false;
+        }
+        return true;
     }
 }
 
