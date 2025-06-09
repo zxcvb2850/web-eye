@@ -1,14 +1,15 @@
-import {Monitor} from "./core/Monitor";
-import {WebEyeConfig} from "./types";
-import {ConsolePlugin} from "./plugins/ConsolePlugin";
-import {RequestPlugin} from "./plugins/RequestPlugin";
-import {ResourcePlugin} from "./plugins/ResourcePlugin";
-import {ErrorPlugin} from "./plugins/ErrorPlugin";
-import {CustomPlugin} from "./plugins/CustomPlugin";
-import {WhiteScreenPlugin} from "./plugins/WhiteScreenPlugin";
-import {PerformancePlugin} from "./plugins/PerformancePlugin";
-import {RecordPlugin} from "./plugins/RecordPlugin";
+export {Monitor} from "./core/Monitor";
+// import {WebEyeConfig} from "./types";
+export {ConsolePlugin} from "./plugins/ConsolePlugin";
+export {RequestPlugin} from "./plugins/RequestPlugin";
+export {ResourcePlugin} from "./plugins/ResourcePlugin";
+export {ErrorPlugin} from "./plugins/ErrorPlugin";
+export {CustomPlugin} from "./plugins/CustomPlugin";
+export {WhiteScreenPlugin} from "./plugins/WhiteScreenPlugin";
+export {PerformancePlugin} from "./plugins/PerformancePlugin";
+export {RecordPlugin} from "./plugins/RecordPlugin";
 
+/*
 export function initEyeLogs(options: WebEyeConfig): Monitor {
     const monitor = new Monitor(options);
 
@@ -34,4 +35,4 @@ export function initEyeLogs(options: WebEyeConfig): Monitor {
         .install();
 
     return monitor
-}
+}*/
