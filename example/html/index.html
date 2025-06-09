@@ -29,13 +29,15 @@
             enableSourceMap: true,          // 启用source map解析
             filterErrors: (error) => true   // 错误过滤函数
         }))
-        .use(new WebEyeLogs.RequestPlugin())
+        .use(new WebEyeLogs.RequestPlugin({
+            filterHeadersWhite: ["token"],
+        }))
         .use(new WebEyeLogs.ResourcePlugin())
         .use(new WebEyeLogs.RecordPlugin())
         .install();
 
     setTimeout(() => {
-        axios.get("http://localhost:8989/health", {
+        axios.get("http://localhost:8989/healthxx", {
             config: {
                 headers: {
                     token: "xxxxxxxxxxxxxxxxxxxx",
@@ -51,8 +53,9 @@
         const headers = new Headers();
         headers.set("token", "xxxxxxxxxxxxxxxxxxxx");
         headers.set("ddddddd", "ddddddddddd");
-        fetch("http://localhost:8989/health", {
+        fetch("http://localhost:8989/healthxx", {
             method: "GET",
+            headers,
         }).then(res => {
             console.info("fetch res 1: ", res);
             return res.json();
@@ -63,7 +66,7 @@
         })
     }, 1000)
 
-    /*setTimeout(()=>{
+    setTimeout(()=>{
         const obj = {a: 1, b: {c: 2}, d: {e: {f: 3}}};
         console.info("a: ", obj.a)
         console.info("b: ", obj.b)
@@ -72,7 +75,7 @@
         console.info("e: ", obj.d.e)
         console.info("f: ", obj.d.e.f)
         console.info("g: ", obj.d.e.f.g.h);
-    }, 2000)*/
+    }, 3000)
 </script>
 <!--<script src="dddddd.js"></script>-->
 <h3>111111111111111111111111</h3>

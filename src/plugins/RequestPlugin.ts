@@ -77,28 +77,28 @@ export class RequestPlugin extends Plugin {
                     }
                 } catch (error) {
                     success = false;
-                    const endTime = Date.now();
-                    const duration = endTime - startTime;
                     isCorsError = _this.isFetchCorsError(error, url);
                     errorMessage = error instanceof Error ? error.message : `Fetch Error`;
 
-                    _this.safeExecute(() => {
+                    throw error;
+                } finally {
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+                    
+                    if (!success) {
+                        _this.safeExecute(() => {
                         _this.report({
                             type: MonitorType.REQUEST,
                             data: {
                                 url, method, duration, success, errorMessage, isCorsError,
                                 status: response?.status || 0,
-                                requestHeaders: _this.getRequestHeaders(init?.headers),
-                                responseHeaders: response ? _this.getResponseHeaders(response.headers) : undefined,
-                                requestParams: _this.getRequestParams(input, init),
+                                headers: _this.getRequestHeaders(init?.headers),
+                                params: _this.getRequestParams(input, init),
                                 timestamp: Date.now(),
                             }
                         });
                     })
-
-                    throw error;
-                } finally {
-
+                    }
                 }
 
                 return response;
@@ -177,7 +177,6 @@ export class RequestPlugin extends Plugin {
                                         duration, success, errorMessage, isCorsError,
                                         status: this.status,
                                         requestHeaders: _webEyeData_.requestHeaders,
-                                        responseHeaders: _this.getXHRResponseHeaders(this),
                                         requestParams: _webEyeData_.requestParams,
                                         timestamp: Date.now(),
                                     }
@@ -233,19 +232,6 @@ export class RequestPlugin extends Plugin {
                 }
             })
         }
-
-        return Object.keys(result).length > 0 ? result : undefined;
-    }
-
-    /**
-     * 获取 Fetch 响应头
-     * */
-    private getResponseHeaders(headers: Headers): Record<string, string> | undefined {
-        const result: Record<string, string> = {};
-
-        headers.forEach((value, key) => {
-            result[key] = value;
-        })
 
         return Object.keys(result).length > 0 ? result : undefined;
     }
