@@ -105,17 +105,19 @@ export class ConsolePlugin extends Plugin {
                 resolve();
             };
 
+            // 当触发数据库升级时，删除原有的store，并创建新的store
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                if (!db.objectStoreNames.contains(this.config.storeName)) {
-                    const store = db.createObjectStore(this.config.storeName, {
-                        keyPath: 'timestamp',
-                        autoIncrement: false,
-                    });
-                    store.createIndex('timestamp', 'timestamp', { unique: false });
-                    store.createIndex('level', 'level', { unique: false });
+                // 删除已存在的store
+                if (db.objectStoreNames.contains(this.config.storeName)){
+                    db.deleteObjectStore(this.config.storeName);
                 }
+                const store = db.createObjectStore(this.config.storeName, {
+                    autoIncrement: true,
+                });
+                store.createIndex('timestamp', 'timestamp', { unique: false });
+                store.createIndex('level', 'level', { unique: false });
             };
         });
     }
