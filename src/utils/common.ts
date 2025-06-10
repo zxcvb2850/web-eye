@@ -255,35 +255,9 @@ export function isSupported(api: string): boolean {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/**
+ * 判断是对象类型
+ * */
+export function isObject(variable: any): boolean {
+    return variable !== null && typeof variable === 'object' && Object.prototype.toString.call(variable) === '[object Object]';
+}

@@ -99,24 +99,3 @@ export abstract class Plugin implements IPlugin {
         target.removeEventListener(type, listener, options);
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

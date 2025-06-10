@@ -1,3 +1,4 @@
+import { time } from "console";
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
 
@@ -401,7 +402,7 @@ export class ConsolePlugin extends Plugin {
                 data: {
                     logs,
                     count: logs.length,
-                    reportTime: Date.now(),
+                    timestamp: Date.now(),
                 }
             });
 

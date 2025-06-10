@@ -1,5 +1,6 @@
 import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
 import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
+import {Logger} from "./Logger";
 import {strToU8, gzipSync} from "fflate";
 
 /**
@@ -7,6 +8,7 @@ import {strToU8, gzipSync} from "fflate";
  * */
 export class Reporter implements IReporter {
     private config: WebEyeConfig;
+    private logger: Logger;
     private queue: BaseMonitorData[] = [];
     private timer: NodeJS.Timeout | null = null;
     private isReporting = false;
@@ -18,6 +20,7 @@ export class Reporter implements IReporter {
 
     constructor(config: WebEyeConfig) {
         this.config = config;
+        this.logger = new Logger(this.config);
         this.bindBeforeUnload();
     }
 
@@ -67,7 +70,7 @@ export class Reporter implements IReporter {
                     await sleep(retryDelay * retryCount);
                 }
             } catch (error) {
-                console.error('Report error: ', error);
+                this.logger.error('Report error: ', error);
                 retryCount++;
                 if (retryCount < maxRetry) {
                     await sleep(retryDelay * retryCount);
@@ -76,7 +79,7 @@ export class Reporter implements IReporter {
         }
 
         // 重试失败，将数据重新加入队列
-        console.error('Failed to report data after retries');
+        this.logger.error(`Failed to report data ====> ${retryCount}`);
         this.queue.unshift(...data);
         this.isReporting = false;
     }
@@ -145,14 +148,12 @@ export class Reporter implements IReporter {
      * */
     private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
         try {
-            console.info("Core SendRequest Data =====> ", data);
-
             const jsonData = safeJsonStringify(data);
             const { compressed, isCompressed } = this.compressData(jsonData);
 
             // 如果数据量过大，则使用分批发送
             if (compressed.length > this.BEACON_SIZE_LIMIT * 2) {
-                console.info('Large data detected, sending in batches');
+                this.logger.log('Large data detected, sending in batches');
                 return false;
             }
 
@@ -164,7 +165,6 @@ export class Reporter implements IReporter {
 
                 const success = navigator.sendBeacon(`${this.config.reportUrl}/beacon`, blob);
                 if (success) {
-                    console.info(`SendBeacon success (${isCompressed ? 'compressed' : 'original'}):`, data.length, 'items');
                     return true
                 }
             }
@@ -183,10 +183,9 @@ export class Reporter implements IReporter {
                 body: compressed,
                 keepalive: true,
             })
-            console.info('Send batch ====> ', request);
             return request.ok;
         } catch (error) {
-            console.error('Send batch error ====> ', error);
+            this.logger.error('Send batch error ====> ', error);
             return false;
         }
     }
@@ -222,14 +221,14 @@ export class Reporter implements IReporter {
 
                 // 检查URL长度限制
                 if (url.length > 2000) {
-                    console.warn('Image request URL too long, skipping');
+                    this.logger.warn('Image request URL too long, skipping');
                     resolve(false);
                     return;
                 }
 
                 image.src = url;
             } catch (error) {
-                console.error('SendByImage error:', error);
+                this.logger.error('SendByImage error:', error);
                 resolve(false);
             }
         });
@@ -242,11 +241,12 @@ export class Reporter implements IReporter {
         // 页面卸载前发送剩余数据
         window.addEventListener('beforeunload', () => {
             if (this.queue.length > 0) {
+                this.sendRequest(this.queue);
                 // 使用 sendBeacon 或同步请求发送数据
-                navigator.sendBeacon(
+                /*navigator.sendBeacon(
                     this.config.reportUrl,
                     safeJsonStringify(this.queue),
-                )
+                )*/
             }
         })
 

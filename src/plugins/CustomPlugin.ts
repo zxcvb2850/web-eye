@@ -14,7 +14,7 @@ interface CustomReportData {
 // 上报配置接口
 interface ReportOptions {
     includeBehavior?: boolean; // 是否包含行为数据
-    reportRecord?: boolean; // 是否上报录制数据
+    includeRecord?: boolean; // 是否上报录制数据
 }
 
 // 自定义上报插件配置
@@ -100,7 +100,7 @@ export class CustomPlugin extends Plugin {
         const reportData: any = {};
 
         // 添加用户行为数据
-        if (options.includeBehavior && this.errorPlugin) {
+        if (options?.includeBehavior && this.errorPlugin) {
             try {
                 const behaviors = this.errorPlugin.getBehaviorQueue();
                 if (behaviors?.length) {
@@ -112,7 +112,7 @@ export class CustomPlugin extends Plugin {
         }
 
         // 上报用户录制
-        if (options.reportRecord && this.recordPlugin) {
+        if (options?.includeRecord && this.recordPlugin) {
             try {
                 this.recordPlugin.customTrigger(reportId);
             } catch (error) {

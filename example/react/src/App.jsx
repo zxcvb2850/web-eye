@@ -15,26 +15,39 @@ function App() {
     }, [])
 
     const handleClick = () => {
-      window.monitor.updateConfig({
-        extend: {
-          uid: "1213",
-        }
+      // window.monitor.updateConfig({
+      //   extend: {
+      //     uid: "1213",
+      //   }
+      // })
+
+      //   /*const obj = {a: 1, b: {c: 2}};
+      //   console.info("a: ", obj.a)
+      //   console.info("b: ", obj.b)
+      //   console.info("c: ", obj.b.c)
+      //   console.info("d: ", obj.b.d)
+      //   console.info("e: ", obj.b.d.e)*/
+
+      //   // console.log("click react")
+      //   // fetch("http://localhost:8080/test");
+
+      //   window.customReportPlugin.customReport("test_custom", new Date(), {
+      //       includeBehavior: true,
+      //       reportRecord: true,
+      //   })
+
+      window.customReportPlugin.customReport("test_custom", {
+          "uid": "3798",
+          "roomid": "1577092523",
+          "data": {
+              "0": {
+                  "playError": "NotAllowedError",
+                  "video": {},
+                  "playStep": "canplaythrough"
+              },
+              "msg": "https://test-img-play.daidaidj.com/img/fc5a99b1ee56a1b461c962f54ad04f47.mp4播放失败 -- 1"
+          }
       })
-
-        /*const obj = {a: 1, b: {c: 2}};
-        console.info("a: ", obj.a)
-        console.info("b: ", obj.b)
-        console.info("c: ", obj.b.c)
-        console.info("d: ", obj.b.d)
-        console.info("e: ", obj.b.d.e)*/
-
-        // console.log("click react")
-        // fetch("http://localhost:8080/test");
-
-        window.customReportPlugin.customReport("test_custom", new Date(), {
-            includeBehavior: true,
-            reportRecord: true,
-        })
     }
 
     const clickRecordPlay = () => {
