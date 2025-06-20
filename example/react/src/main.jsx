@@ -16,7 +16,7 @@ import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
 const monitor = new Monitor({
     debug: true,
     appKey: "y",
-    reportUrl: "http://localhost:8989/report/v1",
+    reportUrl: "http://localhost:8989/a/r",
     extends: {
         uid: "1111",
         channelId: "10000",

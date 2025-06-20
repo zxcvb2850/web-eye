@@ -10,7 +10,7 @@
 <script>
     const monitor = new WebEyeLogs.Monitor({
         appKey: "xxxxx",
-        reportUrl: "http://localhost:8989/report/v1",
+        reportUrl: "http://localhost:8989/a/r",
     });
 
     monitor
@@ -20,7 +20,7 @@
             // skipSelectors: ["meta", "head", "script", "style"], // 忽略的元素选择器(checkDOMCount 为 true 时生效)
             // whiteScreenDoms: ["#root"],
         }))
-        // .use(new WebEyeLogs.PerformancePlugin())
+        .use(new WebEyeLogs.PerformancePlugin())
         .use(new WebEyeLogs.CustomPlugin())
         .use(new WebEyeLogs.ErrorPlugin({
             enableBehaviorReport: false,      // 启用行为上报

@@ -163,7 +163,7 @@ export class Reporter implements IReporter {
                     type: isCompressed ? 'application/gzip' : 'application/json',
                 });
 
-                const success = navigator.sendBeacon(`${this.config.reportUrl}/beacon`, blob);
+                const success = navigator.sendBeacon(`${this.config.reportUrl}/b`, blob);
                 if (success) {
                     return true
                 }
@@ -177,7 +177,7 @@ export class Reporter implements IReporter {
             if (isCompressed) {
                 headers['Content-Encoding'] = 'gzip';
             }
-            const request = await fetch(`${this.config.reportUrl}/fetch`, {
+            const request = await fetch(`${this.config.reportUrl}/f`, {
                 method: 'POST',
                 headers,
                 body: compressed,
