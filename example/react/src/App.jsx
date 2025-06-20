@@ -47,6 +47,9 @@ function App() {
               },
               "msg": "https://test-img-play.daidaidj.com/img/fc5a99b1ee56a1b461c962f54ad04f47.mp4播放失败 -- 1"
           }
+      }, {
+          // includeBehavior: true,
+          includeRecord: true,
       })
     }
 

@@ -15,7 +15,7 @@ import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
 
 const monitor = new Monitor({
     debug: true,
-    appKey: "y",
+    appKey: "6849ad8e0965ada798d82183",
     reportUrl: "http://localhost:8989/a/r",
     extends: {
         uid: "1111",
@@ -39,7 +39,7 @@ window.recordPlugin = new RecordPlugin();
 monitor
     .use(consolePlugin)
     .use(whiteScreenPlugin)
-    .use(performancePlugin)
+    // .use(performancePlugin)
     .use(customReportPlugin)
     .use(requestPlugin)
     .use(resourcePlugin)

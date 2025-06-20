@@ -27,7 +27,7 @@ interface RecordEvent {
 interface RecordSession {
     id: string;
     triggerType: RecordTriggerType;
-    relatedId?: string; // 触发错误的ID
+    errorId?: string; // 触发错误的ID
     startTime: number;
     endTime?: number;
     events: RecordEvent[];
@@ -296,7 +296,7 @@ export class RecordPlugin extends Plugin {
     /**
      * 开始录制会话
      */
-    private startSession(triggerType: RecordTriggerType, relatedId?: string): string | null {
+    private startSession(triggerType: RecordTriggerType, errorId?: string): string | null {
         try {
             const sessionId = generateId();
 
@@ -304,7 +304,7 @@ export class RecordPlugin extends Plugin {
             const session: RecordSession = {
                 id: sessionId,
                 triggerType,
-                relatedId,
+                errorId,
                 startTime: Date.now(),
                 events: [],
                 status: 'recording'
@@ -396,16 +396,16 @@ export class RecordPlugin extends Plugin {
             let data = session.events;
 
             // 压缩数据
-            if (this.config.enableCompression) {
+            /*if (this.config.enableCompression) {
                 const compressed = await this.compressData(data);
                 data = compressed.data;
-            }
+            }*/
 
             // 准备上报数据
             const reportData = {
-                sessionId: session.id,
+                id: session.id,
                 triggerType: session.triggerType,
-                relatedId: session.relatedId,
+                errorId: session.errorId,
                 events: data,
                 timestamp: Date.now()
             };

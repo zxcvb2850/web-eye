@@ -1,7 +1,7 @@
+import {strToU8, gzipSync} from "fflate";
 import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
 import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
 import {Logger} from "./Logger";
-import {strToU8, gzipSync} from "fflate";
 
 /**
  * 数据上报器
@@ -150,11 +150,13 @@ export class Reporter implements IReporter {
         try {
             const jsonData = safeJsonStringify(data);
             const { compressed, isCompressed } = this.compressData(jsonData);
+            let isMaxBody = false;
 
             // 如果数据量过大，则使用分批发送
-            if (compressed.length > this.BEACON_SIZE_LIMIT * 2) {
+            if (compressed.length > this.BEACON_SIZE_LIMIT) {
                 this.logger.log('Large data detected, sending in batches');
-                return false;
+                isMaxBody = true;
+                // return false;
             }
 
             // 尝试使用 sendBeacon API 发送数据
@@ -174,14 +176,19 @@ export class Reporter implements IReporter {
                 'Content-Type': 'application/json',
                 'EyeLogTag': '1', // 标记为内部请求
             }
+            let body: string|Blob = jsonData;
             if (isCompressed) {
                 headers['Content-Encoding'] = 'gzip';
+                headers['Content-Type'] = 'application/gzip';
+                body = new Blob([compressed], {
+                    type: isCompressed ? 'application/gzip' : 'application/json',
+                });
             }
             const request = await fetch(`${this.config.reportUrl}/f`, {
                 method: 'POST',
                 headers,
-                body: compressed,
-                keepalive: true,
+                body,
+                keepalive: !isMaxBody,
             })
             return request.ok;
         } catch (error) {

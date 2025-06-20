@@ -35,8 +35,7 @@ interface ErrorInfo {
     componentStack?: string; // React/Vue 组件堆栈
     props?: any; // React 错误边界中的 props
     errorInfo?: any; // 额外错误信息
-    timestamp: number;
-    recordSessionId?: string; // 关联录制会话ID
+    recordId?: string; // 关联录制会话ID
 }
 
 /**
@@ -77,7 +76,7 @@ export class ErrorPlugin extends Plugin {
     };
 
     private behaviorQueue: UserAction[] = [];
-    private pendingErrors: Map<string, { error: ErrorInfo; timer: NodeJS.Timeout }> = new Map();
+    private pendingErrors: Map<string, { errorId: string, timer: NodeJS.Timeout }> = new Map();
     private recordPlugin: RecordPlugin | null = null;
 
     constructor(config?: Partial<ErrorConfig>) {
@@ -151,7 +150,6 @@ export class ErrorPlugin extends Plugin {
                 lineno: event.lineno,
                 colno: event.colno,
                 stack: event.error?.stack,
-                timestamp: Date.now(),
             };
 
             this.processError(errorInfo);
@@ -168,7 +166,6 @@ export class ErrorPlugin extends Plugin {
                 type: ErrorType.UNHANDLED_REJECTION,
                 message: event.reason?.message || String(event.reason),
                 stack: event.reason?.stack,
-                timestamp: Date.now(),
             };
 
             this.processError(errorInfo);
@@ -190,13 +187,13 @@ export class ErrorPlugin extends Plugin {
 
             // 将录制会话ID关联到错误信息
             if (recordSessionId) {
-                errorInfo.recordSessionId = recordSessionId;
+                errorInfo.recordId = recordSessionId;
                 this.logger.log(`Error ${errorInfo.id} triggered recording session: ${recordSessionId}`);
             }
         }
 
         // 如果启用source map，尝试解析原始位置
-        if (this.config.enableSourceMap && errorInfo.stack) {
+        if (this.config.enableSourceMap && errorInfo?.stack) {
             const originalStack = await this.parseSourceMap(errorInfo.stack);
             errorInfo.originalStack = originalStack;
             if (Array.isArray(originalStack) && originalStack?.length) {
@@ -208,18 +205,9 @@ export class ErrorPlugin extends Plugin {
         }
 
         // 如果不需要行为上报，直接上报错误
-        if (!this.config.enableBehaviorReport) {
-            await this.reportError(errorInfo);
-            return;
-        }
+        this.reportError(errorInfo);
 
-        // 需要行为上报，延迟上报
-        let timer = setTimeout(async () => {
-            await this.reportError(errorInfo);
-            this.pendingErrors.delete(errorInfo.id);
-        }, this.config.behaviorDelay);
-
-        this.pendingErrors.set(errorInfo.id, { error: errorInfo, timer });
+        this.errorTrigger(errorInfo.id);
     }
 
     /**
@@ -235,7 +223,6 @@ export class ErrorPlugin extends Plugin {
                 componentStack: errorInfo.componentStack,
                 props: this.serializeProps(props),
                 errorInfo,
-                timestamp: Date.now(),
             };
 
             this.processError(errorInfoObj);
@@ -249,8 +236,6 @@ export class ErrorPlugin extends Plugin {
         this.safeExecute(() => {
             const errorInfo: ErrorInfo = {
                 id: generateId(),
-
-
                 type: ErrorType.VUE_ERROR,
                 message: error.message,
                 stack: error.stack,
@@ -260,7 +245,6 @@ export class ErrorPlugin extends Plugin {
                     componentName: vm?.$options?.name || vm?.$options?._componentTag,
                     propsData: vm?.$options?.propsData
                 },
-                timestamp: Date.now(),
             };
 
             this.processError(errorInfo);
@@ -310,6 +294,19 @@ export class ErrorPlugin extends Plugin {
         } catch (error) {
             return '[Serialization Error]';
         }
+    }
+
+    /**
+     * 触发行为上报
+     * */
+    public async errorTrigger(errorId: string) {
+        // 需要行为上报，延迟上报
+        let timer = setTimeout(async () => {
+            await this.reportBehavior(errorId);
+            this.pendingErrors.delete(errorId);
+        }, this.config.behaviorDelay);
+
+        this.pendingErrors.set(errorId, { errorId, timer });
     }
 
     /**
@@ -443,19 +440,30 @@ export class ErrorPlugin extends Plugin {
     }
 
     /**
-     * 上报错误及用户行为
+     * 上报错误
      */
     private async reportError(errorInfo: ErrorInfo): Promise<void> {
-        const behaviorData = [...this.behaviorQueue];
-
-        const data: Record<string, any> = { error: errorInfo, timestamp: Date.now() };
-        if (behaviorData?.length) {
-            data.behaviors = behaviorData;
-        }
-
         await this.report({
             type: MonitorType.CODE,
-            data
+            data: {
+                timestamp: Date.now(),
+                ...errorInfo,
+            }
+        });
+    }
+
+    /**
+     * 上报用户行为
+     * */
+    private async reportBehavior(errorId: string): Promise<void> {
+        if (!this.behaviorQueue?.length) return;
+        await this.report({
+            type: MonitorType.BEHAVIOR,
+            data: {
+                timestamp: Date.now(),
+                errorId,
+                behaviors: this.behaviorQueue
+            }
         });
     }
 
@@ -479,9 +487,9 @@ export class ErrorPlugin extends Plugin {
      */
     private handleBeforeUnload(): void {
         // 立即上报所有pending的错误
-        this.pendingErrors.forEach(async ({ error, timer }) => {
+        this.pendingErrors.forEach(async ({ errorId, timer }) => {
             timer && clearTimeout(timer);
-            await this.reportError(error);
+            await this.reportBehavior(errorId);
         });
         this.pendingErrors.clear();
     }
@@ -490,9 +498,9 @@ export class ErrorPlugin extends Plugin {
      * 手动上报错误
      */
     async reportPendingErrors(): Promise<void> {
-        const promises = Array.from(this.pendingErrors.values()).map(async ({ error, timer }) => {
+        const promises = Array.from(this.pendingErrors.values()).map(async ({ errorId, timer }) => {
             clearTimeout(timer);
-            await this.reportError(error);
+            await this.reportBehavior(errorId);
         });
 
         this.pendingErrors.clear();

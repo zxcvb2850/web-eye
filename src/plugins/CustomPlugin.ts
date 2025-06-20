@@ -72,8 +72,8 @@ export class CustomPlugin extends Plugin {
             this.report({
                 type: MonitorType.CUSTOM,
                 data: {
+                    id: reportId,
                     event: event.toString(),
-                    reportId,
                     ...reportOtherData,
                     content,
                     timestamp: Date.now(),
@@ -102,10 +102,7 @@ export class CustomPlugin extends Plugin {
         // 添加用户行为数据
         if (options?.includeBehavior && this.errorPlugin) {
             try {
-                const behaviors = this.errorPlugin.getBehaviorQueue();
-                if (behaviors?.length) {
-                    reportData.behaviors = behaviors.slice(-this.config.maxBehaviorRecords);
-                }
+                this.errorPlugin.errorTrigger(reportId);
             } catch (error) {
                this.logger.warn(`Add user behaviors failed ====>`, error);
             }
@@ -114,7 +111,7 @@ export class CustomPlugin extends Plugin {
         // 上报用户录制
         if (options?.includeRecord && this.recordPlugin) {
             try {
-                this.recordPlugin.customTrigger(reportId);
+                reportData.recordId = this.recordPlugin.customTrigger(reportId);
             } catch (error) {
                 this.logger.warn(`Add user record failed ====>`, error);
             }
