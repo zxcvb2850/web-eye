@@ -3,6 +3,7 @@ import {Reporter} from "./Reporter";
 import {Logger} from "./Logger";
 import {generateSessionId, getFingerprint} from "../utils/common";
 import {getDeviceInfo} from "../utils/device";
+import { version } from '../../package.json';
 
 /**
  * 主监控类
@@ -138,7 +139,7 @@ export class Monitor {
         }
 
         const monitorData = this.createMonitorData(data);
-        await this.reporter.report(monitorData);
+        await this.reporter.report([monitorData]);
     }
 
     /**
@@ -149,6 +150,7 @@ export class Monitor {
             appKey: this.config.appKey,
             visitorId: this.visitorId || this.sessionId,
             sessionId: this.sessionId,
+            SDKVersion: version,
             deviceInfo: getDeviceInfo(),
             extends: this.config.extends,
             ...data,

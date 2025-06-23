@@ -36,6 +36,7 @@ export interface BaseMonitorData {
     type: MonitorType; // 错误类型
     visitorId: string; // 指纹ID
     sessionId: string; // 会话ID
+    SDKVersion: string; // SDK版本
     data: IAnyObject; // 所上报的数据
     deviceInfo: DeviceInfo; // 设备信息
     extends: ExtendInfo; // 拓展信息

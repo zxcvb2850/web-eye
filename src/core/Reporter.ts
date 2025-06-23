@@ -27,7 +27,7 @@ export class Reporter implements IReporter {
     /**
      * 上报数据
      * */
-    async report(data: BaseMonitorData | BaseMonitorData[]): Promise<void> {
+    async report(data: BaseMonitorData[]): Promise<void> {
         const items = Array.isArray(data) ? data: [data];
 
         await this.sendData(items);

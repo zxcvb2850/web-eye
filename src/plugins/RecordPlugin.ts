@@ -1,6 +1,6 @@
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
-import {generateId} from "../utils/common";
+import { generateId, safeJsonStringify } from "../utils/common";
 import { record } from 'rrweb';
 
 /**
@@ -406,7 +406,7 @@ export class RecordPlugin extends Plugin {
                 id: session.id,
                 triggerType: session.triggerType,
                 errorId: session.errorId,
-                events: data,
+                events: safeJsonStringify(data),
                 timestamp: Date.now()
             };
 
