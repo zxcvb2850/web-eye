@@ -1,5 +1,6 @@
 import { Plugin } from "../core/Plugin";
 import { debounce, isSupported } from "../utils/common";
+import { addEventListener } from "../utils/helpers";
 import { MonitorType } from "../types";
 
 // 检测结果接口
@@ -68,7 +69,7 @@ export class WhiteScreenPlugin extends Plugin {
 
         // 等待页面基本加载完成后开始检测
         if (document.readyState === 'complete') {
-            this.addEventListener(document, 'DOMContentLoaded', () => {
+            addEventListener(document, 'DOMContentLoaded', () => {
                 setTimeout(() => this.startDetection(), this.config.delayCheck);
             });
         } else {

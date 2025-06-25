@@ -1,7 +1,9 @@
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
 import { generateId, safeJsonStringify } from "../utils/common";
+import { addEventListener } from "../utils/helpers";
 import { record } from 'rrweb';
+import {IndexedDBManager} from "../utils/indexedDBManager";
 
 /**
  * 录制事件类型
@@ -131,7 +133,7 @@ export class RecordPlugin extends Plugin {
                 url: false
             },
             recordCanvas: false,     // 是否录制canvas
-            recordCrossOriginIframes: false, // 是否录制跨域iframe
+            recordCrossOriginIframes: true, // 是否录制跨域iframe
             collectFonts: false,     // 是否收集字体
             sampling: {
                 scroll: 800,         // 滚动事件采样间隔
@@ -172,6 +174,9 @@ export class RecordPlugin extends Plugin {
     // 错误-录制会话映射
     private errorSessionMap: Map<string, string> = new Map();
 
+    // indexedDB
+    // private db: IndexedDBManager;
+
     constructor(config?: Partial<RecordConfig>) {
         super();
         this.config = { ...this.config, ...config };
@@ -179,9 +184,17 @@ export class RecordPlugin extends Plugin {
         // 初始化事件缓冲区 (前置缓冲时间 / 平均事件间隔)
         const bufferSize = Math.ceil(this.config.bufferTime / 100); // 假设平均100ms一个事件
         this.eventBuffer = new CircularBuffer<RecordEvent>(Math.max(bufferSize, 50));
+
+        /*this.db = new IndexedDBManager({
+            storeName: "record",
+            version: 1,
+            keyPath: 'timestamp',
+            autoIncrement: true,
+            indexes: [{ name: 'errorId', keyPath: 'errorId', unique: false }],
+        })*/
     }
 
-    protected init(): void {
+    protected async init(): Promise<void> {
         this.logger.log('Init RecordPlugin');
 
         // 初始化存储大小统计
@@ -192,6 +205,10 @@ export class RecordPlugin extends Plugin {
 
         // 绑定页面卸载事件
         this.bindUnloadEvents();
+
+        /*await this.db.init();
+        const result = await this.db.getAll();
+        console.info("result", result);*/
     }
 
     protected destroy(): void {
@@ -375,6 +392,11 @@ export class RecordPlugin extends Plugin {
         // 清理当前会话ID
         this.currentSessionId = null;
 
+        console.info("session", session);
+        // 如果是关闭页面时触发的，则保存到indexedDB中，下次初始化检查并进行上报
+        if (reason === "page_unload") {
+            // this.db.add(session);
+        }
         // 上报录制数据
         this.reportSession(session);
 
@@ -512,8 +534,8 @@ export class RecordPlugin extends Plugin {
             this.handleBeforeUnload();
         };
 
-        this.addEventListener(window, 'beforeunload', handleUnload);
-        this.addEventListener(document, 'visibilitychange', () => {
+        addEventListener(window, 'beforeunload', handleUnload);
+        addEventListener(document, 'visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 this.handleBeforeUnload();
             }

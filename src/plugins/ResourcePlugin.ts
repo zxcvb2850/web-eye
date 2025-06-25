@@ -1,4 +1,5 @@
 import {Plugin} from "../core/Plugin";
+import { addEventListener, removeEventListener } from "../utils/helpers";
 import {MonitorType} from "../types";
 
 /**
@@ -55,8 +56,8 @@ export class ResourcePlugin extends Plugin {
     protected destroy() : void {
         // 移除错误监听
         if (this.errorHandler) {
-            window.removeEventListener('error', this.errorHandler, true);
-            window.removeEventListener('unhandledrejection', this.errorHandler);
+            removeEventListener(window,'error', this.errorHandler, true);
+            removeEventListener(window,'unhandledrejection', this.errorHandler);
         }
 
         // 断开性能观察器
@@ -92,11 +93,12 @@ export class ResourcePlugin extends Plugin {
         }
 
         // 使用捕获监听，确保能捕获到所有资源错误
-        window.addEventListener('error', this.errorHandler, true);
+        addEventListener(window, 'error', this.errorHandler, true);
 
         // 监听 Promise 拒绝（可能包含资源相关的异步错误）
-        window.addEventListener('unhandledrejection', (event) => {
+        addEventListener(window, 'unhandledrejection', (event) => {
             _this.safeExecute(() => {
+                // @ts-ignore
                 const error = event.reason;
 
                 // 检查是否是资源相关的 Promise 错误

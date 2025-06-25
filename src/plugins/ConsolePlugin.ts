@@ -1,6 +1,6 @@
-import { time } from "console";
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
+import {IndexedDBManager} from "../utils/indexedDBManager";
 
 /**
  * 日志等级枚举
@@ -30,8 +30,6 @@ interface LogRecord {
 interface ConsoleConfig {
     logLevel: LogLevel;
     maxRecords: number;
-    dbName: string;
-    storeName: string;
     enableStackTrace: boolean;
     ignorePatterns: (RegExp|string)[]; // 忽略日志的正则表达式
 }
@@ -45,14 +43,12 @@ export class ConsolePlugin extends Plugin {
     private config: ConsoleConfig = {
         logLevel: LogLevel.DEBUG,
         maxRecords: 100,
-        dbName: 'WebEyeLogger',
-        storeName: 'logs',
         enableStackTrace: true,
         ignorePatterns: [/\[WebEyeLog\]/],
     };
 
     private isReporting: boolean = false; // 上报标记
-    private db: IDBDatabase | null = null;
+    private db: IndexedDBManager;
     private readonly originalConsole: {
         log: typeof console.log;
         warn: typeof console.warn;
@@ -71,13 +67,24 @@ export class ConsolePlugin extends Plugin {
             error: console.error,
             debug: console.debug,
         };
+
+        this.db = new IndexedDBManager({
+            storeName: 'logs',
+            version: 1,
+            keyPath: 'timestamp',
+            autoIncrement: true,
+            indexes: [
+                { name: 'timestamp', keyPath: 'timestamp', unique: false },
+                { name: 'level', keyPath: 'level', unique: false }
+            ],
+        })
     }
 
     protected async init(): Promise<void> {
         this.logger.log(`Init LoggerPlugin`);
 
         try {
-            await this.initIndexedDB();
+            await this.db.init();
             this.hijackConsole();
         } catch (error) {
             this.logger.error("Failed to initialize ConsolePlugin:", error);
@@ -86,40 +93,7 @@ export class ConsolePlugin extends Plugin {
 
     protected destroy(): void {
         this.restoreConsole();
-        this.closeDB();
-    }
-
-    /**
-     * 初始化IndexedDB
-     */
-    private async initIndexedDB(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const request = indexedDB.open(this.config.dbName, 1);
-
-            request.onerror = () => {
-                reject(new Error(`Failed to open IndexedDB: ${request.error}`));
-            };
-
-            request.onsuccess = () => {
-                this.db = request.result;
-                resolve();
-            };
-
-            // 当触发数据库升级时，删除原有的store，并创建新的store
-            request.onupgradeneeded = (event) => {
-                const db = (event.target as IDBOpenDBRequest).result;
-
-                // 删除已存在的store
-                if (db.objectStoreNames.contains(this.config.storeName)){
-                    db.deleteObjectStore(this.config.storeName);
-                }
-                const store = db.createObjectStore(this.config.storeName, {
-                    autoIncrement: true,
-                });
-                store.createIndex('timestamp', 'timestamp', { unique: false });
-                store.createIndex('level', 'level', { unique: false });
-            };
-        });
+        this.db.close();
     }
 
     /**
@@ -198,10 +172,10 @@ export class ConsolePlugin extends Plugin {
                 logRecord.stack = this.getStackTrace();
             }
 
-            await this.saveLogRecord(logRecord);
+            await this.db.add(logRecord);
 
             // 检查是否需要上报
-            const count = await this.getLogCount();
+            const count = await this.db.count();
             if (count >= this.config.maxRecords && !this.isReporting) {
                 this.isReporting = true;
                 await this.reportAndClearLogs();
@@ -313,89 +287,13 @@ export class ConsolePlugin extends Plugin {
     }
 
     /**
-     * 保存日志记录到IndexedDB
-     */
-    private async saveLogRecord(record: LogRecord): Promise<void> {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                reject(new Error('Database not initialized'));
-                return;
-            }
-
-            const transaction = this.db.transaction([this.config.storeName], 'readwrite');
-            const store = transaction.objectStore(this.config.storeName);
-            const request = store.add(record);
-
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    /**
-     * 获取日志数量
-     */
-    private async getLogCount(): Promise<number> {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                resolve(0);
-                return;
-            }
-
-            const transaction = this.db.transaction([this.config.storeName], 'readonly');
-            const store = transaction.objectStore(this.config.storeName);
-            const request = store.count();
-
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    /**
-     * 获取所有日志记录
-     */
-    private async getAllLogs(): Promise<LogRecord[]> {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                resolve([]);
-                return;
-            }
-
-            const transaction = this.db.transaction([this.config.storeName], 'readonly');
-            const store = transaction.objectStore(this.config.storeName);
-            const request = store.getAll();
-
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    /**
-     * 清空所有日志记录
-     */
-    private async clearLogs(): Promise<void> {
-        return new Promise((resolve, reject) => {
-            if (!this.db) {
-                resolve();
-                return;
-            }
-
-            const transaction = this.db.transaction([this.config.storeName], 'readwrite');
-            const store = transaction.objectStore(this.config.storeName);
-            const request = store.clear();
-
-            request.onsuccess = () => resolve();
-            request.onerror = () => reject(request.error);
-        });
-    }
-
-    /**
      * 上报并清空日志
      */
     private async reportAndClearLogs(): Promise<void> {
         try {
             this.logger.log("Starting to report logs");
 
-            const logs = await this.getAllLogs();
+            const logs = await this.db.getAll();
             if (logs.length === 0) return;
 
             // 上报数据
@@ -409,23 +307,13 @@ export class ConsolePlugin extends Plugin {
             });
 
             // 清空本地数据
-            await this.clearLogs();
+            await this.db.clear();
 
             this.logger.log(`Reported and cleared ${logs.length} log records`);
         } catch (error) {
             this.logger.error("Failed to report logs:", error);
         } finally {
             this.isReporting = false;
-        }
-    }
-
-    /**
-     * 关闭数据库连接
-     */
-    private closeDB(): void {
-        if (this.db) {
-            this.db.close();
-            this.db = null;
         }
     }
 
@@ -452,7 +340,7 @@ export class ConsolePlugin extends Plugin {
      * 获取当前日志数量
      */
     async getCurrentLogCount(): Promise<number> {
-        return await this.getLogCount();
+        return await this.db.count();
     }
 
     /**
@@ -460,7 +348,7 @@ export class ConsolePlugin extends Plugin {
      */
     async clearAllLogs(): Promise<void> {
         try {
-            await this.clearLogs();
+            await this.db.close();
             this.logger.log("All logs cleared");
         } catch (error) {
             this.logger.error("Clear logs failed:", error);

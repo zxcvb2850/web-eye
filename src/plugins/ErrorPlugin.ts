@@ -1,5 +1,6 @@
 import { Plugin } from "../core/Plugin";
 import { generateId, throttle } from "../utils/common";
+import { addEventListener, removeEventListener } from "../utils/helpers";
 import { MonitorType } from "../types";
 import { RecordPlugin } from "./RecordPlugin";
 
@@ -121,10 +122,10 @@ export class ErrorPlugin extends Plugin {
      */
     private bindErrorListeners(): void {
         // @ts-ignore JS运行时错误
-        this.addEventListener(window, 'error', this.handleJSError.bind(this));
+        addEventListener(window, 'error', this.handleJSError.bind(this));
 
         // @ts-ignore Promise未捕获错误（如果需要的话可以启用
-        this.addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
+        addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
     }
 
     /**
@@ -132,9 +133,9 @@ export class ErrorPlugin extends Plugin {
      */
     private removeErrorListeners(): void {
         // @ts-ignore
-        this.removeEventListener(window, 'error', this.handleJSError.bind(this));
+        removeEventListener(window, 'error', this.handleJSError.bind(this));
         // @ts-ignore
-        this.removeEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
+        removeEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
     }
 
     /**
@@ -347,7 +348,7 @@ export class ErrorPlugin extends Plugin {
      */
     private startBehaviorTracking(): void {
         // 记录点击事件
-        this.addEventListener(document, 'click', (event) => {
+        addEventListener(document, 'click', (event) => {
             let classNames: string[] = [];
             let classList = ((event.target as Element)?.classList || []);
             classList.forEach((className) => classNames.push(className));
@@ -379,7 +380,7 @@ export class ErrorPlugin extends Plugin {
         });*/
 
         // 记录滚动事件（节流）
-        this.addEventListener(window, 'scroll', throttle(() => {
+        addEventListener(window, 'scroll', throttle(() => {
             this.recordUserAction({
                 type: 'scroll',
                 timestamp: Date.now(),
@@ -391,7 +392,7 @@ export class ErrorPlugin extends Plugin {
         }, 5000));
 
         // 记录页面跳转
-        this.addEventListener(window, 'hashchange', () => {
+        addEventListener(window, 'hashchange', () => {
             this.recordUserAction({
                 type: 'hashchange',
                 timestamp: Date.now(),
@@ -399,6 +400,15 @@ export class ErrorPlugin extends Plugin {
                     hash: window.location.hash,
                     href: window.location.href
                 }
+            });
+        });
+
+        // 记录页面可见性
+        addEventListener(document, 'visibilitychange', () => {
+            this.recordUserAction({
+                type: 'visibility',
+                timestamp: Date.now(),
+                data: document.visibilityState
             });
         });
     }
@@ -471,15 +481,15 @@ export class ErrorPlugin extends Plugin {
      * 绑定页面卸载事件
      */
     private bindBeforeUnload(): void {
-        this.addEventListener(window, 'beforeunload', () => {
+        addEventListener(window, 'beforeunload', () => {
             this.handleBeforeUnload();
         });
 
-        this.addEventListener(document, 'visibilitychange', () => {
+        /*addEventListener(document, 'visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
                 this.handleBeforeUnload();
             }
-        });
+        });*/
     }
 
     /**

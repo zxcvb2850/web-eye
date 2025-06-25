@@ -74,28 +74,4 @@ export abstract class Plugin implements IPlugin {
             this.logger.error(`Error in plugin ${this.name}: `, error);
         }
     }
-
-    /**
-     * 添加事件监听器
-     * */
-    protected addEventListener(
-        target: EventTarget,
-        type: string,
-        listener: EventListener,
-        options?: boolean | AddEventListenerOptions
-    ): void {
-        target.addEventListener(type, listener, options);
-    }
-
-    /**
-     * 移除事件监听器
-     * */
-    protected removeEventListener(
-        target: EventTarget,
-        type: string,
-        listener: EventListener,
-        options?: boolean | EventListenerOptions
-    ): void {
-        target.removeEventListener(type, listener, options);
-    }
 }

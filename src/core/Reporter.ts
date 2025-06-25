@@ -1,6 +1,7 @@
 import {strToU8, gzipSync} from "fflate";
 import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
 import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
+import { addEventListener } from "../utils/helpers";
 import {Logger} from "./Logger";
 
 /**
@@ -246,7 +247,7 @@ export class Reporter implements IReporter {
      * */
     private bindBeforeUnload(): void {
         // 页面卸载前发送剩余数据
-        window.addEventListener('beforeunload', () => {
+        addEventListener(window, 'beforeunload', () => {
             if (this.queue.length > 0) {
                 this.sendRequest(this.queue);
                 // 使用 sendBeacon 或同步请求发送数据
@@ -258,7 +259,7 @@ export class Reporter implements IReporter {
         })
 
         // 页面隐藏时发送数据
-        document.addEventListener('visibilitychange', () => {
+        addEventListener(document,'visibilitychange', () => {
             if (getPageVisibility() === "hidden" && this.queue.length > 0) {
                 this.flush();
             }
