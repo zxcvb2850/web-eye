@@ -36,7 +36,7 @@ export class IndexedDBManager {
     // 初始化
     async init(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, this.config.version);
+            const request = indexedDB.open(DB_NAME, this.config.version!);
 
             request.onerror = () => {
                 reject(new Error(`Failed to open IndexedDB: ${request.error}`));
@@ -58,7 +58,7 @@ export class IndexedDBManager {
 
                 // 创建 store
                 const store = db.createObjectStore(this.config.storeName, {
-                    keyPath: this.config.keyPath,
+                    keyPath: this.config.keyPath || "id",
                     autoIncrement: this.config.autoIncrement ?? true,
                 })
 

@@ -70,8 +70,8 @@ export class ConsolePlugin extends Plugin {
 
         this.db = new IndexedDBManager({
             storeName: 'logs',
-            version: 1,
-            keyPath: 'timestamp',
+            version: 2,
+            keyPath: 'id',
             autoIncrement: true,
             indexes: [
                 { name: 'timestamp', keyPath: 'timestamp', unique: false },
