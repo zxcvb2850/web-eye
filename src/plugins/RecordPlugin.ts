@@ -3,7 +3,8 @@ import { MonitorType } from "../types";
 import { generateId, safeJsonStringify } from "../utils/common";
 import { addEventListener } from "../utils/helpers";
 import { record } from 'rrweb';
-import {IndexedDBManager} from "../utils/indexedDBManager";
+import {listenerHandler, EventType, eventWithTime} from "@rrweb/types";
+import {recordOptions} from "rrweb/typings/types";
 
 /**
  * 录制事件类型
@@ -12,6 +13,31 @@ export enum RecordTriggerType {
     MANUAL = 'manual',      // 手动触发
     ERROR = 'error',        // 错误触发
     CUSTOM = 'custom'       // 自定义触发
+}
+
+// 会话状态
+interface SessionState {
+    sessionId: string;
+    errorId?: string | null;
+    startTime: number;
+    lastFullSnapshot: eventWithTime | null;
+    events: eventWithTime[];
+    isReporting: boolean;
+    reportTimer: NodeJS.Timeout | null;
+}
+
+// 缓存数据结构
+interface CacheData {
+    sessionId: string;
+    errorId?: string | null;
+    events: eventWithTime[];
+    metadata: {
+        startTime: number;
+        endTime: number;
+        url: string;
+        userAgent: string;
+    };
+    timestamp: number;
 }
 
 /**
@@ -23,90 +49,55 @@ interface RecordEvent {
     timestamp: number;
 }
 
-/**
- * 录制会话
- */
-interface RecordSession {
+// 上报数据接口
+interface ReportData {
     id: string;
-    triggerType: RecordTriggerType;
-    errorId?: string; // 触发错误的ID
-    startTime: number;
-    endTime?: number;
-    events: RecordEvent[];
-    status: 'recording' | 'completed' | 'error';
+    errorId?: string | null;
+    events: eventWithTime[];
+    metadata: {
+        startTime: number;
+        endTime: number;
+        duration: number;
+        eventCount: number;
+        url: string;
+        userAgent: string;
+        triggerReason: 'manual' | 'beforeunload' | 'cache_restore';
+    };
+    compressed?: boolean;
+    size: number;
 }
 
-/**
- * 循环缓冲区
- */
-class CircularBuffer<T> {
-    private buffer: T[] = [];
-    private size: number;
-    private head = 0;
-    private tail = 0;
-    private count = 0;
-
-    constructor(size: number) {
-        this.size = size;
-        this.buffer = new Array(size);
-    }
-
-    push(item: T): void {
-        this.buffer[this.tail] = item;
-        this.tail = (this.tail + 1) % this.size;
-
-        if (this.count < this.size) {
-            this.count++;
-        } else {
-            this.head = (this.head + 1) % this.size;
-        }
-    }
-
-    getAll(): T[] {
-        if (this.count === 0) return [];
-
-        const result: T[] = [];
-        let current = this.head;
-
-        for (let i = 0; i < this.count; i++) {
-            result.push(this.buffer[current]);
-            current = (current + 1) % this.size;
-        }
-
-        return result;
-    }
-
-    clear(): void {
-        this.head = 0;
-        this.tail = 0;
-        this.count = 0;
-    }
-
-    getCount(): number {
-        return this.count;
-    }
-}
-
-/**
- * 录制配置接口
- */
+// 配置接口
 interface RecordConfig {
-    // 录制配置
-    recordOptions: any; // RecordOptions 类型
-    maxDuration: number; // 最大录制时长(ms)
-    bufferTime: number; // 前置缓冲时间(ms) - 发生事件前的录制时间
-    afterTime: number; // 后置录制时间(ms) - 发生事件后的录制时间
-
-    // 数据管理
-    maxEvents: number; // 单次录制最大事件数
-
-    // 压缩配置
-    enableCompression: boolean; // 启用压缩
-    compressionLevel: number; // 压缩级别 1-9
-
-    // 存储配置
-    maxStorageSize: number; // 最大存储大小(字节)
-    cleanupThreshold: number; // 清理阈值
+    // 延迟上报时间（毫秒）
+    delayReportTime?: number;
+    // 最大缓存事件数量
+    maxCacheEvents?: number;
+    // 最大上报大小（字节）
+    maxReportSize?: number;
+    // 缓存本地存储key前缀
+    cacheKeyPrefix?: string;
+    // 性能配置
+    performance?: {
+        // 事件采样配置
+        sampling?: {
+            scroll?: number;
+            mousemove?: number;
+            mouseInteraction?: number;
+            input?: number;
+        };
+        // 内存清理间隔（毫秒）
+        memoryCleanInterval?: number;
+        // 最大内存使用阈值（MB）
+        maxMemoryUsage?: number;
+    };
+    // 隐私配置
+    privacy?: {
+        ignoreClass?: string;
+        blockClass?: string;
+        maskAllInputs?: boolean;
+        maskInputOptions?: Record<string, boolean>;
+    };
 }
 
 /**
@@ -114,322 +105,530 @@ interface RecordConfig {
  * */
 export class RecordPlugin extends Plugin {
     name = 'RecordPlugin';
+    private stopRecording: listenerHandler | undefined = null;
+    private session: SessionState;
+    private memoryCleanTimer: NodeJS.Timeout | null = null;
+    private isInitialized = false;
 
-    private config: RecordConfig = {
-        // 录制配置
-        recordOptions: {
-            checkoutEveryNms: 30000, // 30秒创建一个checkpoint
-            checkoutEveryNth: 80,   // 每200个事件创建一个checkpoint
-            maskAllInputs: true,     // 屏蔽所有输入
-            maskTextSelector: '[data-mask]', // 文本屏蔽选择器
-            // blockSelector: '[data-block]',   // 元素阻止选择器
-            ignoreSelector: '[data-ignore]', // 忽略选择器
-            maskInputOptions: {
-                password: true,
-                email: false,
-                number: false,
-                search: false,
-                tel: false,
-                url: false
-            },
-            recordCanvas: false,     // 是否录制canvas
-            recordCrossOriginIframes: true, // 是否录制跨域iframe
-            collectFonts: false,     // 是否收集字体
+    private readonly config: RecordConfig = {
+        delayReportTime: 3000,
+        maxCacheEvents: 200,
+        maxReportSize: 2 * 1024 * 1024, // 5MB
+        cacheKeyPrefix: 'rrweb_cache_',
+        performance: {
             sampling: {
-                scroll: 800,         // 滚动事件采样间隔
-                mousemove: 600,       // 鼠标移动采样间隔
-                mouseInteraction: true, // 鼠标交互事件
-                input: 'last'        // 输入事件采样策略
+                scroll: 100,
+                mousemove: 100,
+                mouseInteraction: 0,
+                input: 0
+            },
+            memoryCleanInterval: 30000, // 30秒
+            maxMemoryUsage: 200 // 200MB
+        },
+        privacy: {
+            ignoreClass: 'rr-ignore',
+            blockClass: 'rr-block',
+            maskAllInputs: false,
+            maskInputOptions: {
+                color: true,
+                date: true,
+                email: true,
+                password: true,
+                tel: true,
+                text: true,
+                textarea: true
             }
         },
-        maxDuration: 30000, // 30秒
-        bufferTime: 3000,   // 前3秒
-        afterTime: 3000,    // 后3秒
-
-        // 数据管理
-        maxEvents: 1000,
-
-        // 压缩配置
-        enableCompression: true,
-        compressionLevel: 6,
-
-        // 存储配置
-        maxStorageSize: 50 * 1024 * 1024, // 50MB
-        cleanupThreshold: 0.8 // 80%时清理
     };
-
-    private stopRecording: ReturnType<typeof record> | null = null;
-    private eventBuffer: CircularBuffer<RecordEvent>;
-    private activeSessions: Map<string, RecordSession> = new Map();
-    private isRecording = false;
-    private currentSessionId: string | null = null;
-
-    // 存储管理
-    private storageSize = 0;
-
-    // 定时器
-    private bufferTimer: NodeJS.Timeout | null = null;
-    private afterTimer: NodeJS.Timeout | null = null;
-
-    // 错误-录制会话映射
-    private errorSessionMap: Map<string, string> = new Map();
-
-    // indexedDB
-    // private db: IndexedDBManager;
 
     constructor(config?: Partial<RecordConfig>) {
         super();
         this.config = { ...this.config, ...config };
 
-        // 初始化事件缓冲区 (前置缓冲时间 / 平均事件间隔)
-        const bufferSize = Math.ceil(this.config.bufferTime / 100); // 假设平均100ms一个事件
-        this.eventBuffer = new CircularBuffer<RecordEvent>(Math.max(bufferSize, 50));
-
-        /*this.db = new IndexedDBManager({
-            storeName: "record",
-            version: 1,
-            keyPath: 'timestamp',
-            autoIncrement: true,
-            indexes: [{ name: 'errorId', keyPath: 'errorId', unique: false }],
-        })*/
+        this.session = this.createNewSession();
     }
 
     protected async init(): Promise<void> {
-        this.logger.log('Init RecordPlugin');
+        if (this.isInitialized) return;
 
-        // 初始化存储大小统计
-        this.calculateStorageSize();
+        try {
+            // 检查并恢复缓存的录制数据
+            await this.restoreCachedRecordings();
 
-        // 开始持续录制到缓冲区
-        this.startBufferRecording();
+            // 开始自动录制
+            this.startContinuousRecording();
 
-        // 绑定页面卸载事件
-        this.bindUnloadEvents();
+            // 设置页面卸载监听
+            this.setupBeforeUnloadHandler();
 
-        /*await this.db.init();
-        const result = await this.db.getAll();
-        console.info("result", result);*/
+            // 启动内存清理
+            this.startMemoryCleanup();
+
+            this.isInitialized = true;
+            this.logger.log('Init RecordPlugin');
+        } catch (error) {
+            // this.config.onError(error as Error);
+        }
     }
 
     protected destroy(): void {
-        this.logger.log('Destroy RecordPlugin');
-
-        // 停止录制
-        this.stopCurrentRecording();
-
-        // 清理定时器
-        if (this.bufferTimer) {
-            clearTimeout(this.bufferTimer);
-            this.bufferTimer = null;
-        }
-
-        if (this.afterTimer) {
-            clearTimeout(this.afterTimer);
-            this.afterTimer = null;
-        }
-
-        // 清理所有会话
-        this.activeSessions.clear();
-
-        // 清理错误-会话映射
-        this.errorSessionMap.clear();
-
-        // 清理缓冲区
-        this.eventBuffer.clear();
-    }
-
-    /**
-     * 开始缓冲录制 - 持续录制到循环缓冲区
-     */
-    private startBufferRecording(): void {
-        if (this.isRecording) return;
-
-        try {
-            this.stopRecording = record({
-                ...this.config.recordOptions,
-                emit: (event: RecordEvent) => {
-                    // 只在缓冲阶段时才添加到缓冲区
-                    if (!this.currentSessionId) {
-                        this.eventBuffer.push(event);
-                    } else {
-                        // 如果有活跃会话，直接添加到会话中
-                        const session = this.activeSessions.get(this.currentSessionId);
-                        if (session && session.status === 'recording') {
-                            this.addEventToSession(this.currentSessionId, event);
-                        }
-                    }
-                }
-            });
-
-            this.isRecording = true;
-            this.logger.log('Buffer recording started');
-        } catch (error) {
-            this.logger.error('Failed to start buffer recording:', error);
-        }
-    }
-
-    /**
-     * 停止当前录制
-     */
-    private stopCurrentRecording(): void {
         if (this.stopRecording) {
             this.stopRecording();
             this.stopRecording = null;
-            this.isRecording = false;
-        }
-    }
-
-    /**
-     * 手动触发录制
-     */
-    public manualTrigger(triggerData?: any): string | null {
-        return this.startSession(RecordTriggerType.MANUAL, triggerData);
-    }
-
-    /**
-     * 自定义触发录制
-     */
-    public customTrigger(errorId?: string): string | null {
-        return this.startSession(RecordTriggerType.CUSTOM, errorId);
-    }
-
-    /**
-     * 错误触发录制
-     */
-    public errorTrigger(errorId: string): string | null {
-        this.logger.log('Error triggered recording:', errorId);
-
-        // 延迟触发，给错误处理一些时间
-        const sessionId = this.startSession(RecordTriggerType.ERROR, errorId);
-
-        // 建立错误ID与录制会话ID的映射
-        if (sessionId && errorId) {
-            this.errorSessionMap.set(errorId, sessionId);
         }
 
-        return sessionId;
+        if (this.session.reportTimer) {
+            clearTimeout(this.session.reportTimer);
+        }
+
+        if (this.memoryCleanTimer) {
+            clearInterval(this.memoryCleanTimer);
+        }
+
+        console.log('录制器已销毁');
     }
 
-    /**
-     * 开始录制会话
-     */
-    private startSession(triggerType: RecordTriggerType, errorId?: string): string | null {
+    // 创建新会话
+    private createNewSession(): SessionState {
+        return {
+            sessionId: generateId(),
+            startTime: Date.now(),
+            lastFullSnapshot: null,
+            events: [],
+            isReporting: false,
+            reportTimer: null
+        };
+    }
+
+    // 开始持续录制
+    private startContinuousRecording(): void {
+        if (this.stopRecording) {
+            this.stopRecording();
+        }
+
+        const options: recordOptions<eventWithTime> = {
+            emit: (event: eventWithTime) => {
+                this.handleEvent(event);
+            },
+            collectFonts: false,
+            recordCanvas: false,
+            recordCrossOriginIframes: false,
+        }
+        // this.config.performance?.sampling && (options.sampling = this.config.performance.sampling)
+        if (this.config.performance?.sampling) {
+            if (!options.sampling) options.sampling = {} ;
+            this.config.performance.sampling?.scroll && (options.sampling.scroll = this.config.performance.sampling.scroll)
+            this.config.performance.sampling?.mousemove && (options.sampling.mousemove = this.config.performance.sampling.mousemove)
+            // this.config.performance.sampling?.mouseInteraction && (options.sampling.mouseInteraction = this.config.performance.sampling.mouseInteraction)
+            // this.config.performance.sampling?.input && (options.sampling.input = this.config.performance.sampling.input)
+        }
+        this.config.privacy?.ignoreClass && (options.ignoreClass = this.config.privacy.ignoreClass)
+        this.config.privacy?.blockClass && (options.ignoreClass = this.config.privacy.ignoreClass)
+        this.config.privacy?.maskAllInputs && (options.maskAllInputs = this.config.privacy.maskAllInputs)
+        // this.config.privacy?.maskInputOptions && (options.maskInputOptions = this.config.privacy.maskInputOptions)
+
+        this.stopRecording = record(options);
+
+        console.log('开始持续录制，会话ID:', this.session.sessionId);
+    }
+
+    // 处理录制事件
+    private handleEvent(event: eventWithTime): void {
         try {
-            const sessionId = generateId();
+            // 保存完整快照引用
+            if (event.type === EventType.FullSnapshot) {
+                this.session.lastFullSnapshot = event;
+            }
 
-            // 创建录制会话
-            const session: RecordSession = {
-                id: sessionId,
-                triggerType,
-                errorId,
-                startTime: Date.now(),
-                events: [],
-                status: 'recording'
-            };
+            // 添加事件到缓存
+            this.session.events.push(event);
 
-            // 添加缓冲区的事件
-            const bufferEvents = this.eventBuffer.getAll();
-            session.events.push(...bufferEvents);
+            // 检查内存使用
+            this.checkMemoryUsage();
 
-            this.activeSessions.set(sessionId, session);
-            this.currentSessionId = sessionId;
-
-            this.logger.log(`Recording session started: ${sessionId}`, {
-                triggerType,
-                bufferEvents: bufferEvents.length
-            });
-
-            // 设置录制结束定时器
-            this.scheduleSessionEnd(sessionId);
-
-            return sessionId;
+            // 保持事件数量在限制范围内
+            if (this.session.events.length > this.config.maxCacheEvents) {
+                this.trimEvents();
+            }
         } catch (error) {
-            this.logger.error('Failed to start recording session:', error);
-            return null;
+            // this.config.onError(error as Error);
+            console.error("handleEvent error", error);
         }
     }
 
-    /**
-     * 添加事件到会话
-     */
-    private addEventToSession(sessionId: string, event: RecordEvent): void {
-        const session = this.activeSessions.get(sessionId);
-        if (!session || session.status !== 'recording') return;
-
-        // 检查事件数量限制
-        if (session.events.length >= this.config.maxEvents) {
-            this.endSession(sessionId, 'max_events_reached');
+    // 触发上报
+    public errorTrigger(errorId: string): string | null {
+        if (this.session.isReporting) {
+            console.log('正在上报中，忽略重复触发');
             return;
         }
 
-        session.events.push(event);
+        this.session.isReporting = true;
+        this.session.errorId = errorId;
+        console.log(`触发上报，将在 ${this.config.delayReportTime}ms 后执行`);
+
+        // 设置延迟上报定时器
+        this.session.reportTimer = setTimeout(() => {
+            this.executeReport('manual');
+        }, this.config.delayReportTime);
+
+        return this.session.sessionId;
     }
 
-    /**
-     * 计划会话结束
-     */
-    private scheduleSessionEnd(sessionId: string): void {
-        // 设置后置录制时间结束定时器
-        this.afterTimer = setTimeout(() => {
-            this.endSession(sessionId, 'time_limit_reached');
-        }, this.config.afterTime);
+    // 取消上报
+    public cancelReport(): void {
+        if (this.session.reportTimer) {
+            clearTimeout(this.session.reportTimer);
+            this.session.reportTimer = null;
+            this.session.isReporting = false;
+            console.log('取消上报');
+        }
     }
 
-    /**
-     * 结束录制会话
-     */
-    private endSession(sessionId: string, reason: string): void {
-        const session = this.activeSessions.get(sessionId);
-        if (!session) return;
+    // 执行上报
+    private async executeReport(triggerReason: 'manual' | 'beforeunload' | 'cache_restore'): Promise<void> {
+        try {
+            const reportData = this.prepareReportData(triggerReason);
 
-        session.status = 'completed';
-        session.endTime = Date.now();
+            // 检查上报大小
+            if (reportData.size > this.config.maxReportSize) {
+                console.warn('上报数据过大，进行压缩处理');
+                await this.compressReportData(reportData);
+            }
 
-        this.logger.log(`Recording session ended: ${sessionId}`, {
-            reason,
+            await this.report({
+                type: MonitorType.RECORD,
+                data: {...reportData, events: safeJsonStringify(reportData.events)}
+            });
+
+            console.log(`上报完成，会话ID: ${reportData.id}, 事件数: ${reportData.events.length}`);
+
+            // 重置会话（保留最后的完整快照）
+            this.resetSession();
+
+        } catch (error) {
+            // this.config.onError(error as Error);
+            console.error("executeReport error: ", error);
+
+            // 上报失败，缓存到本地
+            if (triggerReason !== 'cache_restore') {
+                await this.cacheFailedReport();
+            }
+        }
+    }
+
+    // 准备上报数据
+    private prepareReportData(triggerReason: 'manual' | 'beforeunload' | 'cache_restore'): ReportData {
+        const events = this.getCompleteEventSequence();
+        const eventsJson = safeJsonStringify(events);
+
+        return {
+            id: this.session.sessionId,
+            events: events,
+            errorId: this.session.errorId || null,
+            metadata: {
+                startTime: this.session.startTime,
+                endTime: Date.now(),
+                duration: Date.now() - this.session.startTime,
+                eventCount: events.length,
+                url: window.location.href,
+                userAgent: navigator.userAgent,
+                triggerReason
+            },
+            compressed: false,
+            size: new Blob([eventsJson]).size
+        };
+    }
+    // 获取完整的事件序列（确保包含完整快照）
+    private getCompleteEventSequence(): eventWithTime[] {
+        const events = [...this.session.events];
+
+        // 确保开头有完整快照
+        if (this.session.lastFullSnapshot) {
+            const hasFullSnapshot = events.some(event =>
+                event.type === EventType.FullSnapshot && event.timestamp >= this.session.startTime
+            );
+
+            if (!hasFullSnapshot) {
+                // 插入最后的完整快照到开头
+                events.unshift(this.session.lastFullSnapshot);
+            }
+        }
+
+        return events;
+    }
+
+    // 压缩上报数据
+    private async compressReportData(reportData): Promise<void> {
+        try {
+            // 移除不必要的事件
+            const filteredEvents = this.filterUnnecessaryEvents(reportData.events);
+
+            // 如果还是太大，保留关键事件
+            if (JSON.stringify(filteredEvents).length > this.config.maxReportSize / 2) {
+                reportData.events = this.getKeyEvents(filteredEvents);
+            } else {
+                reportData.events = filteredEvents;
+            }
+
+            reportData.compressed = true;
+            reportData.size = new Blob([JSON.stringify(reportData.events)]).size;
+
+            console.log(`数据压缩完成，原始事件数: ${reportData.metadata.eventCount}, 压缩后: ${reportData.events.length}`);
+        } catch (error) {
+            console.error("compressReportData error: ", error);
+        }
+    }
+
+    // 过滤不必要的事件
+    private filterUnnecessaryEvents(events: eventWithTime[]): eventWithTime[] {
+        return events.filter(event => {
+            // 保留关键事件类型
+            if (event.type === EventType.FullSnapshot ||
+                event.type === EventType.Meta ||
+                event.type === EventType.Load) {
+                return true;
+            }
+
+            // 对于增量快照，过滤掉频繁的鼠标移动事件
+            if (event.type === EventType.IncrementalSnapshot) {
+                const data = event.data as any;
+                if (data.source === 1 && data.type === 1) { // 鼠标移动
+                    // 保留部分鼠标移动事件
+                    return Math.random() < 0.1;
+                }
+            }
+
+            return true;
+        });
+    }
+
+    // 获取关键事件（确保录制完整性）
+    private getKeyEvents(events: eventWithTime[]): eventWithTime[] {
+        const keyEvents: eventWithTime[] = [];
+        let lastFullSnapshot: eventWithTime | null = null;
+
+        for (const event of events) {
+            // 必须保留的事件类型
+            if (event.type === EventType.FullSnapshot ||
+                event.type === EventType.Meta ||
+                event.type === EventType.Load) {
+                keyEvents.push(event);
+                if (event.type === EventType.FullSnapshot) {
+                    lastFullSnapshot = event;
+                }
+            }
+            // 保留用户交互事件
+            else if (event.type === EventType.IncrementalSnapshot) {
+                const data = event.data as any;
+                if (data.source === 2 || // 鼠标交互
+                    data.source === 3 || // 滚动
+                    data.source === 5) { // 输入
+                    keyEvents.push(event);
+                }
+            }
+        }
+
+        // 确保有完整快照
+        if (lastFullSnapshot && keyEvents[0]?.type !== EventType.FullSnapshot) {
+            keyEvents.unshift(lastFullSnapshot);
+        }
+
+        return keyEvents;
+    }
+
+    // 重置会话
+    private resetSession(): void {
+        // 保留最后的完整快照作为下一个会话的起点
+        const lastFullSnapshot = this.session.lastFullSnapshot;
+
+        this.session = this.createNewSession();
+        this.session.lastFullSnapshot = lastFullSnapshot;
+
+        // 如果有完整快照，添加到新会话的开头
+        if (lastFullSnapshot) {
+            this.session.events = [lastFullSnapshot];
+        }
+    }
+
+    // 修剪事件数组
+    private trimEvents(): void {
+        const targetSize = Math.floor(this.config.maxCacheEvents * 0.8);
+        const eventsToRemove = this.session.events.length - targetSize;
+
+        if (eventsToRemove > 0) {
+            // 找到最近的完整快照
+            let lastFullSnapshotIndex = -1;
+            for (let i = this.session.events.length - 1; i >= 0; i--) {
+                if (this.session.events[i].type === EventType.FullSnapshot) {
+                    lastFullSnapshotIndex = i;
+                    break;
+                }
+            }
+
+            // 如果找到完整快照，从它开始保留
+            if (lastFullSnapshotIndex > 0) {
+                this.session.events = this.session.events.slice(lastFullSnapshotIndex);
+                this.session.lastFullSnapshot = this.session.events[0];
+            } else {
+                // 否则移除最旧的事件
+                this.session.events.splice(0, eventsToRemove);
+            }
+        }
+    }
+
+    // 检查内存使用
+    private checkMemoryUsage(): void {
+        if (typeof performance !== 'undefined' && performance.memory) {
+            const memoryUsage = performance.memory.usedJSHeapSize / 1024 / 1024;
+            if (!(this.config.performance) || memoryUsage > this.config.performance.maxMemoryUsage) {
+                console.warn(`内存使用过高: ${memoryUsage.toFixed(2)}MB，执行清理`);
+                this.trimEvents();
+            }
+        }
+    }
+
+    // 启动内存清理
+    private startMemoryCleanup(): void {
+        if (this.config.performance) {
+            this.memoryCleanTimer = setInterval(() => {
+                this.trimEvents();
+            }, this.config.performance.memoryCleanInterval);
+        }
+    }
+
+    // 设置页面卸载处理
+    private setupBeforeUnloadHandler(): void {
+        window.addEventListener('beforeunload', () => {
+            this.handleBeforeUnload();
         });
 
-        // 清理当前会话ID
-        this.currentSessionId = null;
+        window.addEventListener('pagehide', () => {
+            this.handleBeforeUnload();
+        });
+    }
 
-        console.info("session", session);
-        // 如果是关闭页面时触发的，则保存到indexedDB中，下次初始化检查并进行上报
-        if (reason === "page_unload") {
-            // this.db.add(session);
-        }
-        // 上报录制数据
-        this.reportSession(session);
+    // 处理页面卸载
+    private handleBeforeUnload(): void {
+        try {
+            // 取消延迟上报定时器
+            if (this.session.reportTimer) {
+                clearTimeout(this.session.reportTimer);
+            }
 
-        // 清理会话
-        this.activeSessions.delete(sessionId);
+            // 立即缓存当前录制数据
+            this.cacheCurrentSession();
 
-        // 清理定时器
-        if (this.afterTimer) {
-            clearTimeout(this.afterTimer);
-            this.afterTimer = null;
+            console.log('页面卸载，已缓存录制数据');
+        } catch (error) {
+            console.error('页面卸载处理错误:', error);
         }
     }
 
-    /**
-     * 上报录制会话
-     */
-    private async reportSession(session: RecordSession): Promise<void> {
+    // 缓存当前会话
+    private cacheCurrentSession(): void {
         try {
-            let data = session.events;
-
-            // 压缩数据
-            /*if (this.config.enableCompression) {
-                const compressed = await this.compressData(data);
-                data = compressed.data;
-            }*/
-
-            // 准备上报数据
-            const reportData = {
-                id: session.id,
-                triggerType: session.triggerType,
-                errorId: session.errorId,
-                events: safeJsonStringify(data),
+            if (!this.session.isReporting) return;
+            const cacheData: CacheData = {
+                sessionId: this.session.sessionId,
+                errorId: this.session.errorId || null,
+                events: this.getCompleteEventSequence(),
+                metadata: {
+                    startTime: this.session.startTime,
+                    endTime: Date.now(),
+                    url: window.location.href,
+                    userAgent: navigator.userAgent
+                },
                 timestamp: Date.now()
+            };
+
+            const cacheKey = `${this.config.cacheKeyPrefix}${this.session.sessionId}`;
+            localStorage.setItem(cacheKey, safeJsonStringify(cacheData));
+        } catch (error) {
+            console.error('缓存会话数据失败:', error);
+        }
+    }
+
+    // 缓存失败的上报
+    private async cacheFailedReport(): Promise<void> {
+        try {
+            const reportData = this.prepareReportData('manual');
+            const cacheKey = `${this.config.cacheKeyPrefix}failed_${reportData.id}`;
+
+            const cacheData: CacheData = {
+                sessionId: reportData.id,
+                errorId: reportData.errorId || null,
+                events: reportData.events,
+                metadata: {
+                    startTime: reportData.metadata.startTime,
+                    endTime: reportData.metadata.endTime,
+                    url: reportData.metadata.url,
+                    userAgent: reportData.metadata.userAgent
+                },
+                timestamp: Date.now()
+            };
+
+            localStorage.setItem(cacheKey, safeJsonStringify(cacheData));
+            console.log('上报失败，已缓存到本地');
+        } catch (error) {
+            console.error('缓存失败上报数据失败:', error);
+        }
+    }
+
+    // 恢复缓存的录制数据
+    private async restoreCachedRecordings(): Promise<void> {
+        try {
+            const cacheKeys = Object.keys(localStorage).filter(key =>
+                key.startsWith(<string>this.config.cacheKeyPrefix)
+            );
+            console.info("cacheKeys: ", cacheKeys);
+
+            for (const cacheKey of cacheKeys) {
+                try {
+                    const cacheDataStr = localStorage.getItem(cacheKey);
+                    console.info("cacheDataStr: ", cacheDataStr);
+                    if (!cacheDataStr) continue;
+
+                    const cacheData: CacheData = JSON.parse(cacheDataStr);
+
+                    // 检查缓存时间（避免过期数据）
+                    const cacheAge = Date.now() - cacheData.timestamp;
+                    if (cacheAge > 24 * 60 * 60 * 1000) { // 24小时
+                        localStorage.removeItem(cacheKey);
+                        continue;
+                    }
+
+                    // 恢复并上报缓存数据
+                    await this.reportCachedData(cacheData);
+
+                    // 清除已上报的缓存
+                    localStorage.removeItem(cacheKey);
+
+                } catch (error) {
+                    console.error('恢复缓存数据失败:', error);
+                    localStorage.removeItem(cacheKey);
+                }
+            }
+        } catch (error) {
+            console.error('恢复缓存录制数据失败:', error);
+        }
+    }
+
+    // 上报缓存数据
+    private async reportCachedData(cacheData: CacheData): Promise<void> {
+        try {
+            const reportData = {
+                id: cacheData.sessionId,
+                errorId: cacheData.errorId || null,
+                events: safeJsonStringify(cacheData.events),
+                metadata: {
+                    ...cacheData.metadata,
+                    duration: cacheData.metadata.endTime - cacheData.metadata.startTime,
+                    eventCount: cacheData.events.length,
+                    triggerReason: 'cache_restore'
+                },
+                compressed: false,
+                size: new Blob([JSON.stringify(cacheData.events)]).size
             };
 
             // 上报数据
@@ -437,159 +636,34 @@ export class RecordPlugin extends Plugin {
                 type: MonitorType.RECORD,
                 data: reportData
             });
+            console.log(`恢复缓存数据上报完成，会话ID: ${cacheData.sessionId}`);
         } catch (error) {
-            this.logger.error(`Failed to report recording session: ${session.id}`, error);
-            session.status = 'error';
+            console.error('上报缓存数据失败:', error);
+            throw error;
         }
     }
 
-    /**
-     * 压缩数据
-     */
-    private async compressData(data: any): Promise<{ data: any; size: number }> {
-        try {
-            // 检查 fflate 是否可用
-            const fflate = (window as any).fflate;
-            if (!fflate) {
-                this.logger.warn('fflate is not available, skipping compression');
-                const jsonStr = JSON.stringify(data);
-                return {
-                    data: jsonStr,
-                    size: new Blob([jsonStr]).size
-                };
-            }
+    // 获取当前状态
+    public getStatus(): {
+        sessionId: string;
+        isRecording: boolean;
+        isReporting: boolean;
+        eventCount: number;
+        memoryUsage: number;
+        cacheCount: number;
+    } {
+        const cacheCount = Object.keys(localStorage).filter(key =>
+            key.startsWith(<string>this.config.cacheKeyPrefix)
+        ).length;
 
-            // 序列化数据
-            const jsonStr = JSON.stringify(data);
-            const textEncoder = new TextEncoder();
-            const uint8Array = textEncoder.encode(jsonStr);
-
-            // 压缩数据
-            const compressed = fflate.gzipSync(uint8Array, {
-                level: this.config.compressionLevel
-            });
-
-            // 转换为base64
-            const base64 = btoa(String.fromCharCode.apply(null, Array.from(compressed)));
-
-            return {
-                data: {
-                    compressed: true,
-                    data: base64,
-                    originalSize: uint8Array.length
-                },
-                size: compressed.length
-            };
-        } catch (error) {
-            this.logger.error('Compression failed:', error);
-            const jsonStr = JSON.stringify(data);
-            return {
-                data: jsonStr,
-                size: new Blob([jsonStr]).size
-            };
-        }
-    }
-
-    /**
-     * 计算事件大小
-     */
-    private calculateEventSize(event: RecordEvent): number {
-        try {
-            const jsonStr = JSON.stringify(event);
-            return new Blob([jsonStr]).size;
-        } catch (error) {
-            return 1024; // 默认1KB
-        }
-    }
-
-    /**
-     * 计算存储大小
-     */
-    private calculateStorageSize(): void {
-        // 这里可以实现存储大小的计算逻辑
-        // 目前简单设置为0
-        this.storageSize = 0;
-    }
-
-    /**
-     * 清理存储
-     */
-    private async cleanupStorage(): Promise<void> {
-        this.logger.log('Starting storage cleanup');
-
-        // 这里实现存储清理逻辑
-        // 可以清理旧的录制数据
-
-        // 重新计算存储大小
-        this.calculateStorageSize();
-
-        this.logger.log('Storage cleanup completed');
-    }
-
-    /**
-     * 绑定页面卸载事件
-     */
-    private bindUnloadEvents(): void {
-        const handleUnload = () => {
-            this.handleBeforeUnload();
+        return {
+            sessionId: this.session.sessionId,
+            isRecording: this.stopRecording !== null,
+            isReporting: this.session.isReporting,
+            eventCount: this.session.events.length,
+            memoryUsage: typeof performance !== 'undefined' && performance.memory ?
+                Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
+            cacheCount
         };
-
-        addEventListener(window, 'beforeunload', handleUnload);
-        addEventListener(document, 'visibilitychange', () => {
-            if (document.visibilityState === 'hidden') {
-                this.handleBeforeUnload();
-            }
-        });
-    }
-
-    /**
-     * 处理页面卸载
-     */
-    private handleBeforeUnload(): void {
-        // 立即结束所有活跃的录制会话
-        this.activeSessions.forEach((session, sessionId) => {
-            if (session.status === 'recording') {
-                this.endSession(sessionId, 'page_unload');
-            }
-        });
-    }
-
-    /**
-     * 获取活跃会话信息
-     */
-    public getActiveSessions(): RecordSession[] {
-        return Array.from(this.activeSessions.values());
-    }
-
-    /**
-     * 强制结束会话
-     */
-    public forceEndSession(sessionId: string): boolean {
-        const session = this.activeSessions.get(sessionId);
-        if (!session) return false;
-
-        this.endSession(sessionId, 'manual_stop');
-        return true;
-    }
-
-    /**
-     * 更新配置
-     */
-    public updateConfig(config: Partial<RecordConfig>): void {
-        this.config = { ...this.config, ...config };
-        this.logger.log('RecordPlugin config updated:', config);
-
-        // 如果更新了缓冲区大小，需要重新创建缓冲区
-        if (config.bufferTime) {
-            const bufferSize = Math.ceil(this.config.bufferTime / 100);
-            this.eventBuffer = new CircularBuffer<RecordEvent>(Math.max(bufferSize, 50));
-        }
-    }
-
-    /**
-     * 获取配置
-     */
-    public getConfig(): RecordConfig {
-        return { ...this.config };
     }
 }
