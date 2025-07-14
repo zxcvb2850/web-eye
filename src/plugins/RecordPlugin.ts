@@ -19,6 +19,7 @@ export enum RecordTriggerType {
 interface SessionState {
     sessionId: string;
     errorId?: string | null;
+    triggerType: RecordTriggerType;
     startTime: number;
     lastFullSnapshot: eventWithTime | null;
     events: eventWithTime[];
@@ -31,6 +32,7 @@ interface CacheData {
     sessionId: string;
     errorId?: string | null;
     events: eventWithTime[];
+    triggerType: RecordTriggerType;
     metadata: {
         startTime: number;
         endTime: number;
@@ -54,6 +56,7 @@ interface ReportData {
     id: string;
     errorId?: string | null;
     events: eventWithTime[];
+    triggerType: RecordTriggerType;
     metadata: {
         startTime: number;
         endTime: number;
@@ -105,14 +108,14 @@ interface RecordConfig {
  * */
 export class RecordPlugin extends Plugin {
     name = 'RecordPlugin';
-    private stopRecording: listenerHandler | undefined = null;
+    private stopRecording: listenerHandler | null = null;
     private session: SessionState;
     private memoryCleanTimer: NodeJS.Timeout | null = null;
     private isInitialized = false;
 
     private readonly config: RecordConfig = {
         delayReportTime: 3000,
-        maxCacheEvents: 200,
+        maxCacheEvents: 1000,
         maxReportSize: 2 * 1024 * 1024, // 5MB
         cacheKeyPrefix: 'rrweb_cache_',
         performance: {
@@ -192,6 +195,7 @@ export class RecordPlugin extends Plugin {
     private createNewSession(): SessionState {
         return {
             sessionId: generateId(),
+            triggerType: RecordTriggerType.MANUAL,
             startTime: Date.now(),
             lastFullSnapshot: null,
             events: [],
@@ -227,6 +231,7 @@ export class RecordPlugin extends Plugin {
         this.config.privacy?.maskAllInputs && (options.maskAllInputs = this.config.privacy.maskAllInputs)
         // this.config.privacy?.maskInputOptions && (options.maskInputOptions = this.config.privacy.maskInputOptions)
 
+        // @ts-ignore
         this.stopRecording = record(options);
 
         console.log('开始持续录制，会话ID:', this.session.sessionId);
@@ -247,7 +252,7 @@ export class RecordPlugin extends Plugin {
             this.checkMemoryUsage();
 
             // 保持事件数量在限制范围内
-            if (this.session.events.length > this.config.maxCacheEvents) {
+            if (this.config.maxCacheEvents && this.session.events.length > this.config.maxCacheEvents) {
                 this.trimEvents();
             }
         } catch (error) {
@@ -256,14 +261,27 @@ export class RecordPlugin extends Plugin {
         }
     }
 
+    public customTrigger(errorId?: string): string | null {
+        this.session.triggerType = RecordTriggerType.CUSTOM;
+        errorId && (this.session.errorId = errorId);
+
+        // 设置延迟上报定时器
+        this.session.reportTimer = setTimeout(() => {
+            this.executeReport('manual');
+        }, this.config.delayReportTime);
+
+        return this.session.sessionId;
+    }
+
     // 触发上报
     public errorTrigger(errorId: string): string | null {
         if (this.session.isReporting) {
             console.log('正在上报中，忽略重复触发');
-            return;
+            return null;
         }
 
         this.session.isReporting = true;
+        this.session.triggerType = RecordTriggerType.ERROR;
         this.session.errorId = errorId;
         console.log(`触发上报，将在 ${this.config.delayReportTime}ms 后执行`);
 
@@ -291,7 +309,7 @@ export class RecordPlugin extends Plugin {
             const reportData = this.prepareReportData(triggerReason);
 
             // 检查上报大小
-            if (reportData.size > this.config.maxReportSize) {
+            if (this.config.maxReportSize && reportData.size > this.config.maxReportSize) {
                 console.warn('上报数据过大，进行压缩处理');
                 await this.compressReportData(reportData);
             }
@@ -326,6 +344,7 @@ export class RecordPlugin extends Plugin {
             id: this.session.sessionId,
             events: events,
             errorId: this.session.errorId || null,
+            triggerType: this.session.triggerType,
             metadata: {
                 startTime: this.session.startTime,
                 endTime: Date.now(),
@@ -359,13 +378,13 @@ export class RecordPlugin extends Plugin {
     }
 
     // 压缩上报数据
-    private async compressReportData(reportData): Promise<void> {
+    private async compressReportData(reportData: ReportData): Promise<void> {
         try {
             // 移除不必要的事件
             const filteredEvents = this.filterUnnecessaryEvents(reportData.events);
 
             // 如果还是太大，保留关键事件
-            if (JSON.stringify(filteredEvents).length > this.config.maxReportSize / 2) {
+            if (this.config.maxReportSize && JSON.stringify(filteredEvents).length > this.config.maxReportSize / 2) {
                 reportData.events = this.getKeyEvents(filteredEvents);
             } else {
                 reportData.events = filteredEvents;
@@ -453,7 +472,7 @@ export class RecordPlugin extends Plugin {
 
     // 修剪事件数组
     private trimEvents(): void {
-        const targetSize = Math.floor(this.config.maxCacheEvents * 0.8);
+        const targetSize = Math.floor((this.config?.maxCacheEvents || 0) * 0.8);
         const eventsToRemove = this.session.events.length - targetSize;
 
         if (eventsToRemove > 0) {
@@ -479,9 +498,11 @@ export class RecordPlugin extends Plugin {
 
     // 检查内存使用
     private checkMemoryUsage(): void {
+        // @ts-ignore
         if (typeof performance !== 'undefined' && performance.memory) {
+            // @ts-ignore
             const memoryUsage = performance.memory.usedJSHeapSize / 1024 / 1024;
-            if (!(this.config.performance) || memoryUsage > this.config.performance.maxMemoryUsage) {
+            if (!(this.config.performance) || (this.config.performance.maxMemoryUsage && memoryUsage > this.config.performance.maxMemoryUsage)) {
                 console.warn(`内存使用过高: ${memoryUsage.toFixed(2)}MB，执行清理`);
                 this.trimEvents();
             }
@@ -499,13 +520,12 @@ export class RecordPlugin extends Plugin {
 
     // 设置页面卸载处理
     private setupBeforeUnloadHandler(): void {
-        window.addEventListener('beforeunload', () => {
+        addEventListener(window, "beforeunload", () => {
             this.handleBeforeUnload();
-        });
-
-        window.addEventListener('pagehide', () => {
+        })
+        addEventListener(window, "pagehide", () => {
             this.handleBeforeUnload();
-        });
+        })
     }
 
     // 处理页面卸载
@@ -533,6 +553,7 @@ export class RecordPlugin extends Plugin {
                 sessionId: this.session.sessionId,
                 errorId: this.session.errorId || null,
                 events: this.getCompleteEventSequence(),
+                triggerType: this.session.triggerType,
                 metadata: {
                     startTime: this.session.startTime,
                     endTime: Date.now(),
@@ -559,6 +580,7 @@ export class RecordPlugin extends Plugin {
                 sessionId: reportData.id,
                 errorId: reportData.errorId || null,
                 events: reportData.events,
+                triggerType: reportData.triggerType,
                 metadata: {
                     startTime: reportData.metadata.startTime,
                     endTime: reportData.metadata.endTime,
@@ -661,7 +683,9 @@ export class RecordPlugin extends Plugin {
             isRecording: this.stopRecording !== null,
             isReporting: this.session.isReporting,
             eventCount: this.session.events.length,
+            // @ts-ignore
             memoryUsage: typeof performance !== 'undefined' && performance.memory ?
+                // @ts-ignore
                 Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
             cacheCount
         };
