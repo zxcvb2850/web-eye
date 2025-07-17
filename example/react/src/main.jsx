@@ -14,7 +14,8 @@ import {PerformancePlugin} from "../../../src/plugins/PerformancePlugin.js";
 import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
 
 const monitor = new Monitor({
-    debug: true,
+    debug: false,
+    logLevel: 0,
     appKey: "684a798724dd89c2252dc797",
     reportUrl: "http://localhost:8989/a/r",
     extends: {
@@ -23,6 +24,7 @@ const monitor = new Monitor({
     }
 })
 const consolePlugin = new ConsolePlugin({
+    recordInConsole: ['warn'],
     maxRecords: 20,
 });
 const whiteScreenPlugin = new WhiteScreenPlugin({
