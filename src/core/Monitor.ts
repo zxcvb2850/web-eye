@@ -22,13 +22,14 @@ export class Monitor {
         this.sessionId = generateSessionId();
         this.logger = new Logger(this.config);
         this.reporter = new Reporter(this.config);
+        this.visitorId = localStorage.getItem('_eye_visitor_id_') || null;
 
         this.init();
     }
 
     private async init() {
         // 获取指纹
-        this.visitorId = await getFingerprint();
+        !this.visitorId && (this.visitorId = await getFingerprint());
     }
 
     /**

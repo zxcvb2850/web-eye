@@ -3,8 +3,8 @@ import { MonitorType } from "../types";
 import { generateId, safeJsonStringify } from "../utils/common";
 import { addEventListener } from "../utils/helpers";
 import { record } from 'rrweb';
-import {listenerHandler, EventType, eventWithTime} from "@rrweb/types";
-import {recordOptions} from "rrweb/typings/types";
+import { listenerHandler, EventType, eventWithTime, SamplingStrategy } from "@rrweb/types";
+import { recordOptions } from "rrweb/typings/types";
 
 /**
  * 录制事件类型
@@ -42,13 +42,10 @@ interface CacheData {
     timestamp: number;
 }
 
-/**
- * 录制事件数据
- */
-interface RecordEvent {
-    type: number;
-    data: any;
-    timestamp: number;
+interface PerformanceMemory {
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+  usedJSHeapSize: number;
 }
 
 // 上报数据接口
@@ -83,12 +80,7 @@ interface RecordConfig {
     // 性能配置
     performance?: {
         // 事件采样配置
-        sampling?: {
-            scroll?: number;
-            mousemove?: number;
-            mouseInteraction?: number;
-            input?: number;
-        };
+        sampling?: SamplingStrategy;
         // 内存清理间隔（毫秒）
         memoryCleanInterval?: number;
         // 最大内存使用阈值（MB）
@@ -108,7 +100,7 @@ interface RecordConfig {
  * */
 export class RecordPlugin extends Plugin {
     name = 'RecordPlugin';
-    private stopRecording: listenerHandler | null = null;
+    private stopRecording: listenerHandler | null | undefined = null;
     private session: SessionState;
     private memoryCleanTimer: NodeJS.Timeout | null = null;
     private isInitialized = false;
@@ -117,13 +109,14 @@ export class RecordPlugin extends Plugin {
         delayReportTime: 3000,
         maxCacheEvents: 1000,
         maxReportSize: 2 * 1024 * 1024, // 5MB
-        cacheKeyPrefix: 'rrweb_cache_',
+        cacheKeyPrefix: 'webeye_rr_cache_',
         performance: {
             sampling: {
-                scroll: 100,
-                mousemove: 100,
-                mouseInteraction: 0,
-                input: 0
+                scroll: 400,
+                mousemove: 600,
+                mouseInteraction: true,
+                input: 'last',
+                canvas: 60,
             },
             memoryCleanInterval: 30000, // 30秒
             maxMemoryUsage: 200 // 200MB
@@ -131,7 +124,7 @@ export class RecordPlugin extends Plugin {
         privacy: {
             ignoreClass: 'rr-ignore',
             blockClass: 'rr-block',
-            maskAllInputs: false,
+            maskAllInputs: true,
             maskInputOptions: {
                 color: true,
                 date: true,
@@ -170,7 +163,7 @@ export class RecordPlugin extends Plugin {
             this.isInitialized = true;
             this.logger.log('Init RecordPlugin');
         } catch (error) {
-            // this.config.onError(error as Error);
+            this.logger.error('Failed to initialize RecordPlugin:', error);
         }
     }
 
@@ -188,7 +181,7 @@ export class RecordPlugin extends Plugin {
             clearInterval(this.memoryCleanTimer);
         }
 
-        console.log('录制器已销毁');
+        this.logger.log('录制器已销毁');
     }
 
     // 创建新会话
@@ -214,27 +207,16 @@ export class RecordPlugin extends Plugin {
             emit: (event: eventWithTime) => {
                 this.handleEvent(event);
             },
+            ...this.config.privacy,
             collectFonts: false,
             recordCanvas: false,
             recordCrossOriginIframes: false,
         }
-        // this.config.performance?.sampling && (options.sampling = this.config.performance.sampling)
-        if (this.config.performance?.sampling) {
-            if (!options.sampling) options.sampling = {} ;
-            this.config.performance.sampling?.scroll && (options.sampling.scroll = this.config.performance.sampling.scroll)
-            this.config.performance.sampling?.mousemove && (options.sampling.mousemove = this.config.performance.sampling.mousemove)
-            // this.config.performance.sampling?.mouseInteraction && (options.sampling.mouseInteraction = this.config.performance.sampling.mouseInteraction)
-            // this.config.performance.sampling?.input && (options.sampling.input = this.config.performance.sampling.input)
-        }
-        this.config.privacy?.ignoreClass && (options.ignoreClass = this.config.privacy.ignoreClass)
-        this.config.privacy?.blockClass && (options.ignoreClass = this.config.privacy.ignoreClass)
-        this.config.privacy?.maskAllInputs && (options.maskAllInputs = this.config.privacy.maskAllInputs)
-        // this.config.privacy?.maskInputOptions && (options.maskInputOptions = this.config.privacy.maskInputOptions)
+        this.config.performance?.sampling && (options.sampling = this.config.performance.sampling)
 
-        // @ts-ignore
         this.stopRecording = record(options);
 
-        console.log('开始持续录制，会话ID:', this.session.sessionId);
+        this.logger.log('开始持续录制，会话ID:', this.session.sessionId);
     }
 
     // 处理录制事件
@@ -257,7 +239,7 @@ export class RecordPlugin extends Plugin {
             }
         } catch (error) {
             // this.config.onError(error as Error);
-            console.error("handleEvent error", error);
+            this.logger.error("handleEvent error", error);
         }
     }
 
@@ -276,14 +258,14 @@ export class RecordPlugin extends Plugin {
     // 触发上报
     public errorTrigger(errorId: string): string | null {
         if (this.session.isReporting) {
-            console.log('正在上报中，忽略重复触发');
+            this.logger.log('正在上报中，忽略重复触发');
             return null;
         }
 
         this.session.isReporting = true;
         this.session.triggerType = RecordTriggerType.ERROR;
         this.session.errorId = errorId;
-        console.log(`触发上报，将在 ${this.config.delayReportTime}ms 后执行`);
+        this.logger.log(`触发上报，将在 ${this.config.delayReportTime}ms 后执行`);
 
         // 设置延迟上报定时器
         this.session.reportTimer = setTimeout(() => {
@@ -299,7 +281,7 @@ export class RecordPlugin extends Plugin {
             clearTimeout(this.session.reportTimer);
             this.session.reportTimer = null;
             this.session.isReporting = false;
-            console.log('取消上报');
+            this.logger.log('取消上报');
         }
     }
 
@@ -310,7 +292,7 @@ export class RecordPlugin extends Plugin {
 
             // 检查上报大小
             if (this.config.maxReportSize && reportData.size > this.config.maxReportSize) {
-                console.warn('上报数据过大，进行压缩处理');
+                this.logger.warn('上报数据过大，进行压缩处理');
                 await this.compressReportData(reportData);
             }
 
@@ -319,14 +301,13 @@ export class RecordPlugin extends Plugin {
                 data: {...reportData, events: safeJsonStringify(reportData.events)}
             });
 
-            console.log(`上报完成，会话ID: ${reportData.id}, 事件数: ${reportData.events.length}`);
+            this.logger.log(`上报完成，会话ID: ${reportData.id}, 事件数: ${reportData.events.length}`);
 
             // 重置会话（保留最后的完整快照）
             this.resetSession();
 
         } catch (error) {
-            // this.config.onError(error as Error);
-            console.error("executeReport error: ", error);
+            this.logger.error("executeReport error: ", error);
 
             // 上报失败，缓存到本地
             if (triggerReason !== 'cache_restore') {
@@ -393,9 +374,9 @@ export class RecordPlugin extends Plugin {
             reportData.compressed = true;
             reportData.size = new Blob([JSON.stringify(reportData.events)]).size;
 
-            console.log(`数据压缩完成，原始事件数: ${reportData.metadata.eventCount}, 压缩后: ${reportData.events.length}`);
+            this.logger.log(`数据压缩完成，原始事件数: ${reportData.metadata.eventCount}, 压缩后: ${reportData.events.length}`);
         } catch (error) {
-            console.error("compressReportData error: ", error);
+            this.logger.error("compressReportData error: ", error);
         }
     }
 
@@ -498,12 +479,11 @@ export class RecordPlugin extends Plugin {
 
     // 检查内存使用
     private checkMemoryUsage(): void {
-        // @ts-ignore
-        if (typeof performance !== 'undefined' && performance.memory) {
-            // @ts-ignore
-            const memoryUsage = performance.memory.usedJSHeapSize / 1024 / 1024;
+        const memory = (performance as any).memory as PerformanceMemory;
+        if (typeof performance !== 'undefined' && memory) {
+            const memoryUsage = memory.usedJSHeapSize / 1024 / 1024;
             if (!(this.config.performance) || (this.config.performance.maxMemoryUsage && memoryUsage > this.config.performance.maxMemoryUsage)) {
-                console.warn(`内存使用过高: ${memoryUsage.toFixed(2)}MB，执行清理`);
+                this.logger.warn(`内存使用过高: ${memoryUsage.toFixed(2)}MB，执行清理`);
                 this.trimEvents();
             }
         }
@@ -539,9 +519,9 @@ export class RecordPlugin extends Plugin {
             // 立即缓存当前录制数据
             this.cacheCurrentSession();
 
-            console.log('页面卸载，已缓存录制数据');
+            this.logger.log('页面卸载，已缓存录制数据');
         } catch (error) {
-            console.error('页面卸载处理错误:', error);
+            this.logger.error('页面卸载处理错误:', error);
         }
     }
 
@@ -566,7 +546,7 @@ export class RecordPlugin extends Plugin {
             const cacheKey = `${this.config.cacheKeyPrefix}${this.session.sessionId}`;
             localStorage.setItem(cacheKey, safeJsonStringify(cacheData));
         } catch (error) {
-            console.error('缓存会话数据失败:', error);
+            this.logger.error('缓存会话数据失败:', error);
         }
     }
 
@@ -591,9 +571,9 @@ export class RecordPlugin extends Plugin {
             };
 
             localStorage.setItem(cacheKey, safeJsonStringify(cacheData));
-            console.log('上报失败，已缓存到本地');
+            this.logger.log('上报失败，已缓存到本地');
         } catch (error) {
-            console.error('缓存失败上报数据失败:', error);
+            this.logger.error('缓存失败上报数据失败:', error);
         }
     }
 
@@ -603,12 +583,12 @@ export class RecordPlugin extends Plugin {
             const cacheKeys = Object.keys(localStorage).filter(key =>
                 key.startsWith(<string>this.config.cacheKeyPrefix)
             );
-            console.info("cacheKeys: ", cacheKeys);
+            this.logger.log("cacheKeys: ", cacheKeys);
 
             for (const cacheKey of cacheKeys) {
                 try {
                     const cacheDataStr = localStorage.getItem(cacheKey);
-                    console.info("cacheDataStr: ", cacheDataStr);
+                    this.logger.log("cacheDataStr: ", cacheDataStr);
                     if (!cacheDataStr) continue;
 
                     const cacheData: CacheData = JSON.parse(cacheDataStr);
@@ -627,12 +607,12 @@ export class RecordPlugin extends Plugin {
                     localStorage.removeItem(cacheKey);
 
                 } catch (error) {
-                    console.error('恢复缓存数据失败:', error);
+                    this.logger.error('恢复缓存数据失败:', error);
                     localStorage.removeItem(cacheKey);
                 }
             }
         } catch (error) {
-            console.error('恢复缓存录制数据失败:', error);
+            this.logger.error('恢复缓存录制数据失败:', error);
         }
     }
 
@@ -658,9 +638,9 @@ export class RecordPlugin extends Plugin {
                 type: MonitorType.RECORD,
                 data: reportData
             });
-            console.log(`恢复缓存数据上报完成，会话ID: ${cacheData.sessionId}`);
+            this.logger.log(`恢复缓存数据上报完成，会话ID: ${cacheData.sessionId}`);
         } catch (error) {
-            console.error('上报缓存数据失败:', error);
+            this.logger.error('上报缓存数据失败:', error);
             throw error;
         }
     }
@@ -678,15 +658,14 @@ export class RecordPlugin extends Plugin {
             key.startsWith(<string>this.config.cacheKeyPrefix)
         ).length;
 
+        const memory = (performance as any).memory as PerformanceMemory;
         return {
             sessionId: this.session.sessionId,
             isRecording: this.stopRecording !== null,
             isReporting: this.session.isReporting,
             eventCount: this.session.events.length,
-            // @ts-ignore
-            memoryUsage: typeof performance !== 'undefined' && performance.memory ?
-                // @ts-ignore
-                Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) : 0,
+            memoryUsage: typeof performance !== 'undefined' && memory ?
+                Math.round(memory.usedJSHeapSize / 1024 / 1024) : 0,
             cacheCount
         };
     }

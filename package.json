@@ -25,7 +25,10 @@
     "@rrweb/types": "2.0.0-alpha.18",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.15.24",
+    "axios": "^1.10.0",
     "cross-env": "^7.0.3",
+    "form-data": "^4.0.3",
+    "glob": "^11.0.3",
     "prettier": "^3.0.0",
     "tsup": "^8.5.0",
     "typescript": "^5.8.3"

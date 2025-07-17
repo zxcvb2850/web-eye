@@ -20,7 +20,6 @@ export class Logger implements ILogger {
         warn: typeof console.warn;
         error: typeof console.error;
         debug: typeof console.debug;
-        info: typeof console.info;
     };
 
     // 内部Logger，不会被拦截
@@ -45,10 +44,9 @@ export class Logger implements ILogger {
             warn: console.warn.bind(console),
             error: console.error.bind(console),
             debug: console.debug.bind(console),
-            info: console.info.bind(console),
         };
     }
-
+    
     /**
      * 设置日志等级
      */
@@ -67,36 +65,39 @@ export class Logger implements ILogger {
      * DEBUG 级别日志
      */
     debug(...args: any[]): void {
-        if (this.config.logLevel > LogLevel.DEBUG) return;
-
-        this.originalConsole.debug(...args);
+        this.show('debug', ...args);
     }
 
     /**
      * log 级别日志
      */
     log(...args: any[]): void {
-        if (this.config.logLevel > LogLevel.LOG) return;
-
-        this.originalConsole.log(...args);
+        this.show('log', ...args);
     }
 
     /**
      * WARN 级别日志
      */
     warn(...args: any[]): void {
-        if (this.config.logLevel > LogLevel.WARN) return;
-
-        this.originalConsole.warn(...args);
+        this.show('warn', ...args);
     }
 
     /**
      * ERROR 级别日志
      */
     error(...args: any[]): void {
-        if (this.config.logLevel > LogLevel.ERROR) return;
+        this.show('error', ...args);
+    }
 
-        this.originalConsole.error(...args);
+    /**
+     * 展示日志
+     */
+    show(key: keyof typeof this.originalConsole, ...args: any[]): void {
+        if (this.config.logLevel > LogLevel[key.toUpperCase() as keyof typeof LogLevel]) {
+            return;
+        }
+
+        this.originalConsole[key](this.config.prefix, ...args);
     }
 
     protected async init(): Promise<void> {

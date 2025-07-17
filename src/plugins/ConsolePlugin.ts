@@ -13,15 +13,21 @@ export enum LogLevel {
 }
 
 /**
+ * 日志名称
+ */
+export type LogName = 'debug'| 'log' | 'warn' | 'error';
+
+/**
  * 日志记录接口
  */
 interface LogRecord {
     level: LogLevel;
     levelName: string;
     message: string;
-    args: any[];
+    args: string;
     stack?: string;
     timestamp: number;
+    url: string;
 }
 
 /**
@@ -31,6 +37,8 @@ interface ConsoleConfig {
     logLevel: LogLevel;
     maxRecords: number;
     enableStackTrace: boolean;
+    showInConsole: boolean | LogName[]; // 是否在控制台中显示日志
+    recordInConsole: boolean | LogName[]; // 是否在控制台中记录日志
     ignorePatterns: (RegExp|string)[]; // 忽略日志的正则表达式
 }
 
@@ -44,17 +52,14 @@ export class ConsolePlugin extends Plugin {
         logLevel: LogLevel.DEBUG,
         maxRecords: 100,
         enableStackTrace: true,
+        showInConsole: true,
+        recordInConsole: true,
         ignorePatterns: [/\[WebEyeLog\]/],
     };
 
-    private isReporting: boolean = false; // 上报标记
+    private isReporting = false; // 上报标记
     private db: IndexedDBManager;
-    private readonly originalConsole: {
-        log: typeof console.log;
-        warn: typeof console.warn;
-        error: typeof console.error;
-        debug: typeof console.debug;
-    };
+    private originalConsole: Record<string, Function>;
 
     constructor(config?: Partial<ConsoleConfig>) {
         super();
@@ -62,15 +67,16 @@ export class ConsolePlugin extends Plugin {
 
         // 保存原始console方法
         this.originalConsole = {
+            debug: console.debug,
             log: console.log,
             warn: console.warn,
             error: console.error,
-            debug: console.debug,
         };
 
+        // 初始化数据库
         this.db = new IndexedDBManager({
             storeName: 'logs',
-            version: 2,
+            version: 3,
             keyPath: 'id',
             autoIncrement: true,
             indexes: [
@@ -93,38 +99,39 @@ export class ConsolePlugin extends Plugin {
 
     protected destroy(): void {
         this.restoreConsole();
-        this.db.close();
+        this.db?.close?.();
     }
 
     /**
      * 劫持console方法
      */
     private hijackConsole(): void {
-        const levels = [
-            { method: 'debug', level: LogLevel.DEBUG },
-            { method: 'log', level: LogLevel.LOG },
-            { method: 'warn', level: LogLevel.WARN },
-            { method: 'error', level: LogLevel.ERROR },
+        const methods: { name: LogName; level: LogLevel }[] = [
+            { name: 'debug', level: LogLevel.DEBUG },
+            { name: 'log', level: LogLevel.LOG },
+            { name: 'warn', level: LogLevel.WARN },
+            { name: 'error', level: LogLevel.ERROR },
         ];
 
-        levels.forEach(({ method, level }) => {
-            const originalMethod = this.originalConsole[method as keyof typeof this.originalConsole];
+        methods.forEach(({ name, level }) => {
+            const originalMethod = this.originalConsole[name];
 
-            // 检查日志等级
-            if (level < this.config.logLevel) {
-                return;
-            }
-            (console as any)[method] = (...args: any[]) => {
-                // 先执行原始console方法
-                originalMethod.apply(console, args);
-
-                // 检查是否为SDK内部调用或info调用
-                if (method === 'info' || this.shouldIgnoreLog(args)) {
-                    return;
+            (console as any)[name] = (...args: any[]) => {
+                // 根据配置决定是否输出日志
+                if (this.config.showInConsole && !(Array.isArray(this.config.showInConsole) && this.config.showInConsole.includes(name))) {
+                    originalMethod.apply(console, args);
                 }
-
-                // 记录日志
-                this.recordConsoleLog(level, method, args);
+                
+                // 记录日志 不受等级影响
+                // 但受 recordInConsole 影响
+                if (
+                    this.config.recordInConsole && 
+                    !(Array.isArray(this.config.recordInConsole) && this.config.recordInConsole.includes(name)) && 
+                    !this.shouldIgnoreLog(args)
+                ) {
+                    console.info("record log: ", name, args);
+                    // this.recordLog(level, name, args);
+                }
             };
         });
     }
@@ -147,15 +154,15 @@ export class ConsolePlugin extends Plugin {
      * 恢复原始console方法
      */
     private restoreConsole(): void {
-        Object.keys(this.originalConsole).forEach(method => {
-            (console as any)[method] = this.originalConsole[method as keyof typeof this.originalConsole];
+        Object.entries(this.originalConsole).forEach(([name, method]) => {
+            (console as any)[name] = method;
         });
     }
 
     /**
      * 记录日志到IndexedDB
      */
-    private async recordConsoleLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
+    private async recordLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
         if (!this.db) return;
 
         try {
@@ -165,21 +172,18 @@ export class ConsolePlugin extends Plugin {
                 levelName: levelName.toUpperCase(),
                 message: this.formatMessage(args),
                 args: this.serializeArgs(args),
+                url: window.location.href,
             };
 
             // 如果启用堆栈跟踪且是错误日志
-            if (this.config.enableStackTrace && level === LogLevel.ERROR) {
-                logRecord.stack = this.getStackTrace();
+            if (this.config.enableStackTrace && level >= LogLevel.WARN) {
+                logRecord.stack = this.captureStackTrace();
             }
 
             await this.db.add(logRecord);
 
             // 检查是否需要上报
-            const count = await this.db.count();
-            if (count >= this.config.maxRecords && !this.isReporting) {
-                this.isReporting = true;
-                await this.reportAndClearLogs();
-            }
+            await this.checkAndReport();
         } catch (error) {
             this.logger.error("Failed to record log:", error);
         }
@@ -191,7 +195,9 @@ export class ConsolePlugin extends Plugin {
     private formatMessage(args: any[]): string {
         return args.map(arg => {
             if (typeof arg === 'string') return arg;
-            if (arg instanceof Error) return arg.message;
+            if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+            if (arg === null) return 'null';
+            if (arg === undefined) return 'undefined';
             return String(arg);
         }).join(' ');
     }
@@ -199,104 +205,166 @@ export class ConsolePlugin extends Plugin {
     /**
      * 序列化参数
      */
-    private serializeArgs(args: any[]): any[] {
-        return args.map(arg => {
-            try {
-                if (arg === null || arg === undefined) {
-                    return arg;
-                }
-
-                if (typeof arg === 'string' || typeof arg === 'number' || typeof arg === 'boolean') {
-                    return arg;
-                }
-
-                if (arg instanceof Error) {
-                    return {
-                        name: arg.name,
-                        message: arg.message,
-                        stack: arg.stack,
-                        __type: 'Error'
-                    };
-                }
-
-                if (Array.isArray(arg)) {
-                    return arg.map(item => this.safeStringify(item));
-                }
-
-                if (typeof arg === 'object') {
-                    return this.safeStringify(arg);
-                }
-
-                return String(arg);
-            } catch (error) {
-                // @ts-ignore
-                return `[Serialization Error: ${error.message}]`;
-            }
-        });
-    }
-
-    /**
-     * 安全的JSON序列化
-     */
-    private safeStringify(obj: any): any {
-        const seen = new WeakSet();
-
-        const replacer = (key: string, value: any) => {
-            if (typeof value === 'object' && value !== null) {
-                if (seen.has(value)) {
-                    return '[Circular Reference]';
-                }
-                seen.add(value);
-            }
-
-            if (typeof value === 'function') {
-                return `[Function: ${value.name || 'anonymous'}]`;
-            }
-
-            if (value instanceof Date) {
-                return { __type: 'Date', value: value.toISOString() };
-            }
-
-            if (value instanceof RegExp) {
-                return { __type: 'RegExp', value: value.toString() };
-            }
-
-            return value;
-        };
-
+    private serializeArgs(args: any[]): string {
         try {
-            return JSON.parse(JSON.stringify(obj, replacer));
+            const serialized = args.map(arg => this.serializeValue(arg));
+            return JSON.stringify(serialized);
         } catch (error) {
-            // @ts-ignore
-            return `[Stringify Error: ${error.message}]`;
+            return JSON.stringify([`[Serialization Error: ${error}]`]);
         }
     }
+    /**
+     * 序列化单个值
+     */
+    private serializeValue(value: any, depth = 0): any {
+        const MAX_DEPTH = 5;
+        const MAX_STRING_LENGTH = 500;
+        const MAX_ARRAY_LENGTH = 50;
+        const MAX_OBJECT_KEYS = 20;
+
+        if (depth > MAX_DEPTH) {
+            return "[Max Depth Exceeded]";
+        }
+
+        // 处理基础类型
+        if (value === null || value === undefined) {
+            return value;
+        }
+        if (typeof value === "string") {
+            return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}...` : value;
+        }
+        if (typeof value === "number" || typeof value === "boolean") {
+            return value;
+        }
+        if (typeof value === "function") {
+            return `[Function: ${value.name || 'anonymous'}]`;
+        }
+        if (typeof value === "symbol") {
+            return `[Symbol: ${value.description || 'unknown'}]`;
+        }
+
+        /// 处理特殊对象
+        // 错误
+        if (value instanceof Error) {
+            return {
+                __type: "Error",
+                name: value.name,
+                message: value.message,
+                stack: value.stack?.substring(0, MAX_STRING_LENGTH),
+            }
+        }
+        // 日期
+        if (value instanceof Date) {
+            return { __type: "Date", value: value.toISOString() };
+        }
+        // 正则表达式
+        if (value instanceof RegExp) {
+            return { __type: "RegExp", value: value.toString() };
+        }
+
+        // 处理数组
+        if (Array.isArray(value)) {
+            const result = value.slice(0, MAX_ARRAY_LENGTH).map(item => this.serializeValue(item, depth + 1));
+
+            if (value.length > MAX_ARRAY_LENGTH) result.push(`[...${value.length - MAX_ARRAY_LENGTH} more items]`);
+
+            return result;
+        }
+
+        // 处理对象
+        if (typeof value === "object") {
+            // 防止循环引用
+            if (this.hasCircularReference(value)) return "[Circular Reference]";
+
+            const result:any = {};
+            const keys = Object.keys(value).slice(0, MAX_OBJECT_KEYS);
+
+            for (const key of keys) {
+                try {
+                    result[key] = this.serializeValue(value[key], depth + 1)
+                } catch (error) {
+                    result[key] = `[Error: ${error}]`;
+                }
+            }
+
+            if (Object.keys(value).length > MAX_OBJECT_KEYS) {
+                result["..."] = `[${Object.keys(value).length - MAX_OBJECT_KEYS} more keys]`;
+            }
+
+            // 添加构造函数信息
+            if (value.constructor && value.constructor.name !== "object") {
+                result.__constructor = value.constructor.name;
+            }
+
+            return result;
+        }
+
+        return String(value);
+    }
+    /**
+     * 检查是否有循环引用
+     */
+    private hasCircularReference(obj: any): boolean {
+        const seen = new WeakSet();
+        
+        function check(current: any): boolean {
+            if (current === null || typeof current !== "object") return false;
+
+            if (seen.has(current)) return true;
+
+            seen.add(current);
+
+            for (const key in current) {
+                if (current.hasOwnProperty(key) && check(current[key])) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return check(obj);
+    }
 
     /**
-     * 获取堆栈跟踪
+     * 堆栈错误信息
      */
-    private getStackTrace(): string {
+    private captureStackTrace():string {
         try {
-            throw new Error();
-        } catch (error) {
-            const stack = (error as Error).stack || '';
+            const stack = new Error().stack || '';
             const lines = stack.split('\n');
             // 过滤掉插件内部的堆栈信息
-            return lines.slice(3).join('\n');
+            return lines.slice(4).join('\n');
+        } catch (error) {
+            return 'Stack trace unavailable';
         }
     }
 
     /**
-     * 上报并清空日志
+     * 检查并上报
      */
-    private async reportAndClearLogs(): Promise<void> {
-        try {
-            this.logger.log("Starting to report logs");
+    private async checkAndReport(): Promise<void> {
+        if (this.isReporting) return;
 
+        const count = await this.db.count();
+        if (count >= this.config.maxRecords) {
+            await this.reportAndClear();
+        }
+    }
+
+    /**
+     * 上报并清空
+     */
+    private async reportAndClear(): Promise<void> {
+        if (this.isReporting) return;
+
+        this.isReporting = true;
+
+        try {
             const logs = await this.db.getAll();
             if (logs.length === 0) return;
 
-            // 上报数据
+            this.logger.log(`Reported logs: `, logs);
             await this.report({
                 type: MonitorType.CONSOLE,
                 data: {
@@ -306,9 +374,7 @@ export class ConsolePlugin extends Plugin {
                 }
             });
 
-            // 清空本地数据
             await this.db.clear();
-
             this.logger.log(`Reported and cleared ${logs.length} log records`);
         } catch (error) {
             this.logger.error("Failed to report logs:", error);
@@ -318,41 +384,17 @@ export class ConsolePlugin extends Plugin {
     }
 
     /**
-     * 手动上报日志
+     * 手动触发上报
      */
     async manualReport(): Promise<void> {
-        try {
-            await this.reportAndClearLogs();
-        } catch (error) {
-            this.logger.error("Manual report failed:", error);
-        }
+        await this.reportAndClear();
     }
 
     /**
-     * 设置日志等级
+     * 动态设置日志等级
      */
-    setLogLevel(level: LogLevel): void {
+    setLogLevel(level: LogLevel) {
         this.config.logLevel = level;
-        this.logger.log(`Log level set to ${LogLevel[level]}`);
-    }
-
-    /**
-     * 获取当前日志数量
-     */
-    async getCurrentLogCount(): Promise<number> {
-        return await this.db.count();
-    }
-
-    /**
-     * 清空所有日志（不上报）
-     */
-    async clearAllLogs(): Promise<void> {
-        try {
-            await this.db.close();
-            this.logger.log("All logs cleared");
-        } catch (error) {
-            this.logger.error("Clear logs failed:", error);
-        }
     }
 
     /**

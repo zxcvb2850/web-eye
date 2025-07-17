@@ -167,3 +167,12 @@ export interface ILogger {
 export type MonitorData =
     | RequestData
     | ErrorData;
+
+// 打包插件选项参数
+export interface SourcemapUploadPluginOptions {
+    uploadUrl: string;
+    appKey: string;
+    version: string;
+    env?: string;
+    deleteLocalSourceMap?: boolean;
+}

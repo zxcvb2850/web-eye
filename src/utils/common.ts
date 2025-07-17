@@ -6,6 +6,8 @@ import {NetworkInfo} from "../types";
  * */
 export async function getFingerprint(): Promise<string> {
     let visitorId = localStorage.getItem('_eye_visitor_id_');
+    if (visitorId) return visitorId;
+    
     try {
         if (!visitorId) {
             const fp = await FingerprintJS.load()
