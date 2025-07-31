@@ -129,8 +129,7 @@ export class ConsolePlugin extends Plugin {
                     !(Array.isArray(this.config.recordInConsole) && this.config.recordInConsole.includes(name)) && 
                     !this.shouldIgnoreLog(args)
                 ) {
-                    console.info("record log: ", name, args);
-                    // this.recordLog(level, name, args);
+                    this.recordLog(level, name, args);
                 }
             };
         });
