@@ -3,14 +3,16 @@ import {isSupported} from "./common";
 
 interface IndexedDBConfig {
     version?: number; // 版本号默认为1
-    storeName: string; // 表名
-    keyPath?: string; // 主键
-    autoIncrement?: boolean; // 是否自增
-    indexes?: {
-        name: string; // 索引名
-        keyPath: string | string[]; // 索引字段
-        unique?: boolean; // 是否唯一
-    }[];
+    storeNames: {
+        name: string; // store名
+        keyPath?: string; // 主键
+        autoIncrement?: boolean; // 是否自增
+        indexes?: {
+            name: string; // 索引名
+            keyPath: string | string[]; // 索引字段
+            unique?: boolean; // 是否唯一
+        }[];
+    }[]
 }
 
 const DB_NAME = "WebEyeLogger";
@@ -19,10 +21,19 @@ const DB_NAME = "WebEyeLogger";
  * IndexedDB管理类
  * */
 export class IndexedDBManager {
+    private static instance: IndexedDBManager | null = null;
     private db: IDBDatabase | null = null;
-    private config: IndexedDBConfig;
+    private config?: IndexedDBConfig;
+    loaded = false; // 数据库是否已加载
 
-    constructor(config: IndexedDBConfig) {
+    constructor(config?: IndexedDBConfig) {
+        if (IndexedDBManager.instance) {
+            return IndexedDBManager.instance;
+        }
+
+        if (!config) {
+            throw new Error("config is required");   
+        }
         this.config = {
             version: 1,
             ...config
@@ -30,13 +41,22 @@ export class IndexedDBManager {
 
         if (!isSupported("indexedDB")) {
             throw new Error("浏览器不支持indexedDB");
+        } else {
+            this.init();
         }
+
+        IndexedDBManager.instance = this;
+    }
+
+    static getInstance(): IndexedDBManager {
+        return IndexedDBManager.instance!;
     }
 
     // 初始化
     async init(): Promise<void> {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, this.config.version!);
+            const request = indexedDB.open(DB_NAME, this.config!.version!);
+
 
             request.onerror = () => {
                 reject(new Error(`Failed to open IndexedDB: ${request.error}`));
@@ -44,6 +64,7 @@ export class IndexedDBManager {
 
             request.onsuccess = () => {
                 this.db = request.result;
+                this.loaded = true;
                 resolve();
             }
 
@@ -52,26 +73,28 @@ export class IndexedDBManager {
 
                 // 创建或更新 stores
                 // 删除已存在的 store
-                if (db.objectStoreNames.contains(this.config.storeName)) {
-                    db.deleteObjectStore(this.config.storeName);
-                }
+                this.config!.storeNames.forEach(item => {
+                    if (db.objectStoreNames.contains(item.name)) {
+                        db.deleteObjectStore(item.name);
+                    }
 
-                // 创建 store
-                const store = db.createObjectStore(this.config.storeName, {
-                    keyPath: this.config.keyPath || "id",
-                    autoIncrement: this.config.autoIncrement ?? true,
-                })
-
-                // 创建索引
-                if (this.config.indexes?.length) {
-                    this.config.indexes.forEach(item => {
-                        store.createIndex(
-                            item.name,
-                            item.keyPath,
-                            { unique: item.unique ?? false }
-                        )
+                    // 创建 store
+                    const store = db.createObjectStore(item.name, {
+                        keyPath: item.keyPath || "id",
+                        autoIncrement: item.autoIncrement ?? true,
                     })
-                }
+
+                    // 创建索引
+                    if (item.indexes?.length) {
+                        item.indexes.forEach(index => {
+                            store.createIndex(
+                                index.name,
+                                index.keyPath,
+                                { unique: index.unique ?? false }
+                            )
+                        })
+                    }
+                })
             }
         })
     }
@@ -86,12 +109,12 @@ export class IndexedDBManager {
     }
 
     // 添加数据
-    async add<T = any>(data: T): Promise<IDBValidKey> {
+    async add<T = any>(storeName: string, data: T): Promise<IDBValidKey> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readwrite");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.add(data);
 
             request.onsuccess  = () => resolve(request.result);
@@ -100,12 +123,12 @@ export class IndexedDBManager {
     }
 
     // 删除数据
-    async delete(key: IDBValidKey): Promise<void> {
+    async delete(storeName: string, key: IDBValidKey): Promise<void> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readwrite");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.delete(key);
 
             request.onsuccess  = () => resolve();
@@ -114,12 +137,12 @@ export class IndexedDBManager {
     }
 
     // 更新数据
-    async put<T = any>(data: T): Promise<IDBValidKey> {
+    async put<T = any>(storeName: string,data: T): Promise<IDBValidKey> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readwrite");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.put(data);
 
             request.onsuccess  = () => resolve(request.result);
@@ -128,12 +151,12 @@ export class IndexedDBManager {
     }
 
     // 查询单条数据
-    async get<T = any>(key: IDBValidKey): Promise<T | undefined> {
+    async get<T = any>(storeName: string, key: IDBValidKey): Promise<T | undefined> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readonly");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
             const request = store.get(key);
 
             request.onsuccess  = () => resolve(request.result);
@@ -142,12 +165,13 @@ export class IndexedDBManager {
     }
 
     // 查询所有数据
-    async getAll<T = any>(): Promise<T[]> {
+    async getAll<T = any>(storeName: string): Promise<T[]> {
+        console.info('indexedDB getAll');
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readonly");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
             const request = store.getAll();
 
             request.onsuccess  = () => resolve(request.result);
@@ -156,12 +180,12 @@ export class IndexedDBManager {
     }
 
     // 清空 store 中的所有数据
-    async clear(): Promise<void> {
+    async clear(storeName: string): Promise<void> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readwrite");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readwrite");
+            const store = transaction.objectStore(storeName);
             const request = store.clear();
 
             request.onsuccess  = () => resolve();
@@ -170,12 +194,12 @@ export class IndexedDBManager {
     }
 
     // 获取 store 中数据的数量
-    async count(): Promise<number> {
+    async count(storeName: string): Promise<number> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
-            const transaction = this.db!.transaction([this.config.storeName], "readonly");
-            const store = transaction.objectStore(this.config.storeName);
+            const transaction = this.db!.transaction([storeName], "readonly");
+            const store = transaction.objectStore(storeName);
             const request = store.count();
 
             request.onsuccess  = () => resolve(request.result);

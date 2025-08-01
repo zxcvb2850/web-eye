@@ -169,21 +169,23 @@ export class ErrorPlugin extends Plugin {
                 stack: event.reason?.stack,
             };
 
-            this.processError(errorInfo);
+            this.processError(errorInfo, {isBehavior: true, isRecord: false});
         });
     }
 
     /**
      * 处理错误信息
+     * @param errorInfo 错误信息
+     * @param options 选项 {isBehavior: 是否上报行为, isRecord: 是否上报录制}
      */
-    private async processError(errorInfo: ErrorInfo): Promise<void> {
+    private async processError(errorInfo: ErrorInfo, options = {isBehavior: true, isRecord: true}): Promise<void> {
         // 错误过滤
         if (!this.config.filterErrors(errorInfo)) {
             return;
         }
 
         // 触发录制（如果启用）
-        if (this.config.enableRecordTrigger && this.recordPlugin) {
+        if (this.config.enableRecordTrigger && this.recordPlugin && options.isRecord) {
             const recordSessionId = this.recordPlugin.errorTrigger(errorInfo.id);
 
             // 将录制会话ID关联到错误信息
@@ -205,10 +207,13 @@ export class ErrorPlugin extends Plugin {
             }
         }
 
-        // 如果不需要行为上报，直接上报错误
+        // 上报
         this.reportError(errorInfo);
 
-        this.errorTrigger(errorInfo.id);
+        // 触发行为上报（如果启用）
+        if (this.config.enableBehaviorReport && options.isBehavior) {
+            this.behaviorTrigger(errorInfo.id);
+        }
     }
 
     /**
@@ -300,7 +305,7 @@ export class ErrorPlugin extends Plugin {
     /**
      * 触发行为上报
      * */
-    public async errorTrigger(errorId: string) {
+    public async behaviorTrigger(errorId: string) {
         // 需要行为上报，延迟上报
         let timer = setTimeout(async () => {
             await this.reportBehavior(errorId);

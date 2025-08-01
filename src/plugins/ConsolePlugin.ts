@@ -58,7 +58,8 @@ export class ConsolePlugin extends Plugin {
     };
 
     private isReporting = false; // 上报标记
-    private db: IndexedDBManager;
+    private db?: IndexedDBManager;
+    private dbStoreName = 'logs'; // 数据库存储名称
     private originalConsole: Record<string, Function>;
 
     constructor(config?: Partial<ConsoleConfig>) {
@@ -73,24 +74,15 @@ export class ConsolePlugin extends Plugin {
             error: console.error,
         };
 
-        // 初始化数据库
-        this.db = new IndexedDBManager({
-            storeName: 'logs',
-            version: 3,
-            keyPath: 'id',
-            autoIncrement: true,
-            indexes: [
-                { name: 'timestamp', keyPath: 'timestamp', unique: false },
-                { name: 'level', keyPath: 'level', unique: false }
-            ],
-        })
+        console.info("ConsolePlugin init");
     }
 
     protected async init(): Promise<void> {
         this.logger.log(`Init LoggerPlugin`);
 
         try {
-            await this.db.init();
+            // 初始化数据库
+            this.db = IndexedDBManager.getInstance();
             this.hijackConsole();
         } catch (error) {
             this.logger.error("Failed to initialize ConsolePlugin:", error);
@@ -162,7 +154,7 @@ export class ConsolePlugin extends Plugin {
      * 记录日志到IndexedDB
      */
     private async recordLog(level: LogLevel, levelName: string, args: any[]): Promise<void> {
-        if (!this.db) return;
+        if (!this.db?.loaded) return;
 
         try {
             const logRecord: LogRecord = {
@@ -179,7 +171,7 @@ export class ConsolePlugin extends Plugin {
                 logRecord.stack = this.captureStackTrace();
             }
 
-            await this.db.add(logRecord);
+            await this.db.add(this.dbStoreName, logRecord);
 
             // 检查是否需要上报
             await this.checkAndReport();
@@ -343,9 +335,10 @@ export class ConsolePlugin extends Plugin {
      * 检查并上报
      */
     private async checkAndReport(): Promise<void> {
+        if (!this.db) return;
         if (this.isReporting) return;
 
-        const count = await this.db.count();
+        const count = await this.db.count(this.dbStoreName);
         if (count >= this.config.maxRecords) {
             await this.reportAndClear();
         }
@@ -355,12 +348,13 @@ export class ConsolePlugin extends Plugin {
      * 上报并清空
      */
     private async reportAndClear(): Promise<void> {
+        if (!this.db) return;
         if (this.isReporting) return;
 
         this.isReporting = true;
 
         try {
-            const logs = await this.db.getAll();
+            const logs = await this.db.getAll(this.dbStoreName);
             if (logs.length === 0) return;
 
             this.logger.log(`Reported logs: `, logs);
@@ -373,7 +367,7 @@ export class ConsolePlugin extends Plugin {
                 }
             });
 
-            await this.db.clear();
+            await this.db.clear(this.dbStoreName);
             this.logger.log(`Reported and cleared ${logs.length} log records`);
         } catch (error) {
             this.logger.error("Failed to report logs:", error);

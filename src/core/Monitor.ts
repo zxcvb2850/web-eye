@@ -2,6 +2,7 @@ import {BaseMonitorData, IPlugin, MonitorData, WebEyeConfig} from "../types";
 import {Reporter} from "./Reporter";
 import {Logger} from "./Logger";
 import {generateSessionId, getFingerprint} from "../utils/common";
+import {IndexedDBManager} from "../utils/indexedDBManager";
 import {getDeviceInfo} from "../utils/device";
 import { version } from '../../package.json';
 
@@ -30,6 +31,32 @@ export class Monitor {
     private async init() {
         // 获取指纹
         !this.visitorId && (this.visitorId = await getFingerprint());
+
+        // 创建indexedDB
+        new IndexedDBManager({
+            version: 5,
+            storeNames: [
+                {
+                    name: 'logs',
+                    keyPath: 'id',
+                    autoIncrement: true,
+                    indexes: [
+                        { name: 'timestamp', keyPath: 'timestamp', unique: false },
+                        { name: 'level', keyPath: 'level', unique: false }
+                    ]
+                },
+                {
+                    name: 'records',
+                    keyPath: 'id',
+                    indexes: [
+                        { name: 'sessionId', keyPath: 'id', unique: true },
+                        { name: 'timestamp', keyPath: 'timestamp', unique: false },
+                    ]
+                },
+            ]
+        })
+
+        console.info(`WebEye init 2`);
     }
 
     /**

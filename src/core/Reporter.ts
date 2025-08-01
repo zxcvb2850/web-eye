@@ -99,19 +99,20 @@ export class Reporter implements IReporter {
             }
 
             // gzip 压缩数据
-            const compressed = gzipSync(strToU8(data));
+            // const compressed = gzipSync(strToU8(data));
+            const compressed = strToU8(data);
 
             // 如果压缩后的数据比原始更大，则使用原始数据进行上报
-            if (compressed.length > data.length) {
-                return {
-                    compressed: strToU8(data),
-                    isCompressed: false,
-                }
-            }
+            // if (compressed.length > data.length) {
+            //     return {
+            //         compressed: strToU8(data),
+            //         isCompressed: false,
+            //     }
+            // }
 
             return {
                 compressed,
-                isCompressed: true,
+                isCompressed: false,
             }
         } catch (error) {
             console.error(`Failed to compress data ====> ${error}`);
@@ -160,6 +161,7 @@ export class Reporter implements IReporter {
                 // return false;
             }
 
+            console.info('canUseSendBeacon', this.canUseSendBeacon(compressed.length, data.length));
             // 尝试使用 sendBeacon API 发送数据
             if (this.canUseSendBeacon(compressed.length, data.length)) {
                 const blob = new Blob([compressed], {
@@ -191,6 +193,7 @@ export class Reporter implements IReporter {
                 body,
                 keepalive: !isMaxBody,
             })
+            console.info('request', request);
             return request.ok;
         } catch (error) {
             this.logger.error('Send batch error ====> ', error);

@@ -4,6 +4,7 @@ import { generateId, safeJsonStringify } from "../utils/common";
 import { addEventListener } from "../utils/helpers";
 import { record } from 'rrweb';
 import {IndexedDBManager} from "../utils/indexedDBManager";
+import { clear } from "console";
 
 /**
  * 录制事件类型
@@ -168,6 +169,7 @@ export class RecordPlugin extends Plugin {
     private storageSize = 0;
 
     // 定时器
+    private loopCheckDBTimer: NodeJS.Timeout | null = null;
     private bufferTimer: NodeJS.Timeout | null = null;
     private afterTimer: NodeJS.Timeout | null = null;
 
@@ -175,7 +177,8 @@ export class RecordPlugin extends Plugin {
     private errorSessionMap: Map<string, string> = new Map();
 
     // indexedDB
-    private db: IndexedDBManager;
+    private db?: IndexedDBManager;
+    private dbStoreName = "records";
 
     constructor(config?: Partial<RecordConfig>) {
         super();
@@ -184,18 +187,11 @@ export class RecordPlugin extends Plugin {
         // 初始化事件缓冲区 (前置缓冲时间 / 平均事件间隔)
         const bufferSize = Math.ceil(this.config.bufferTime / 100); // 假设平均100ms一个事件
         this.eventBuffer = new CircularBuffer<RecordEvent>(Math.max(bufferSize, 50));
-
-        this.db = new IndexedDBManager({
-            storeName: "record",
-            version: 1,
-            keyPath: 'timestamp',
-            autoIncrement: true,
-            indexes: [{ name: 'errorId', keyPath: 'errorId', unique: false }],
-        })
     }
 
     protected async init(): Promise<void> {
         this.logger.log('Init RecordPlugin');
+        this.db = IndexedDBManager.getInstance();
 
         // 初始化存储大小统计
         this.calculateStorageSize();
@@ -206,9 +202,8 @@ export class RecordPlugin extends Plugin {
         // 绑定页面卸载事件
         this.bindUnloadEvents();
 
-        /*await this.db.init();
-        const result = await this.db.getAll();
-        console.info("result", result);*/
+        // 检查缓存中是否有未上报的数据
+        this.checkForPendingData();
     }
 
     protected destroy(): void {
@@ -236,6 +231,33 @@ export class RecordPlugin extends Plugin {
 
         // 清理缓冲区
         this.eventBuffer.clear();
+    }
+
+    /**
+     * 启动时检查缓存中是否有未上报的数据
+     */
+    protected async checkForPendingData() {
+        // 检查indexedDB是否创建成功，未创建成功则间隔200ms轮询
+        if (!this.db?.loaded) {
+            console.info("======loopCheckDBTimer======", this.db?.loaded);
+            if (!this.loopCheckDBTimer) {
+                this.loopCheckDBTimer = setTimeout(() => {
+                    this.checkForPendingData();
+                }, 200);
+            }
+            return;
+        } else {
+            console.info("======loaded======", this.db?.loaded);
+
+            clearTimeout(this.loopCheckDBTimer!);
+            const result = await this.db.getAll(this.dbStoreName);
+            console.info("============> result", result);
+            result.forEach(session => {
+                this.reportSession(session);
+
+                // this.db?.delete(this.dbStoreName, session.id);
+            })
+        }        
     }
 
     /**
@@ -444,6 +466,9 @@ export class RecordPlugin extends Plugin {
                 data: reportData
             });
         } catch (error) {
+            // 上报失败，缓存到indexedDB
+            this.db && this.db.add(this.dbStoreName, session);
+
             this.logger.error(`Failed to report recording session: ${session.id}`, error);
             session.status = 'error';
         }
@@ -541,9 +566,9 @@ export class RecordPlugin extends Plugin {
         };
 
         addEventListener(window, 'beforeunload', handleUnload);
-        addEventListener(document, 'visibilitychange', () => {
+        addEventListener(window, 'visibilitychange', () => {
             if (document.visibilityState === 'hidden') {
-                this.handleBeforeUnload();
+                handleUnload();
             }
         });
     }
@@ -555,8 +580,8 @@ export class RecordPlugin extends Plugin {
         // 立即结束活跃的录制会话，并将内容缓存
         this.activeSessions.forEach((session, sessionId) => {
             if (session.status === 'recording') {
-                this.endSession(sessionId, 'page_unload');
-                // this.cacheCurrentSession(session, sessionId)
+                // this.endSession(sessionId, 'page_unload');
+                this.cacheCurrentSession(session, sessionId)
             }
         });
     }
@@ -566,8 +591,10 @@ export class RecordPlugin extends Plugin {
      */
     private cacheCurrentSession(session: RecordSession, sessionId: string): void {
         try {
-            if (this.db) this.db.add(session);
+            console.info("cacheCurrentSession: ", session, sessionId);
+            if (this.db) this.db.add(this.dbStoreName, session);
             this.logger.log(`缓存数据成功: ${sessionId}`);
+            this.activeSessions.delete(sessionId);
         } catch (error) {
             this.logger.error(`缓存数据失败: ${sessionId}`, error);
         }

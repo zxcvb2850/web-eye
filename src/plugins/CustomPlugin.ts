@@ -102,7 +102,7 @@ export class CustomPlugin extends Plugin {
         // 添加用户行为数据
         if (options?.includeBehavior && this.errorPlugin) {
             try {
-                this.errorPlugin.errorTrigger(reportId);
+                this.errorPlugin.behaviorTrigger(reportId);
             } catch (error) {
                this.logger.warn(`Add user behaviors failed ====>`, error);
             }
