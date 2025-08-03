@@ -35,7 +35,7 @@ export class IndexedDBManager {
             throw new Error("config is required");   
         }
         this.config = {
-            version: 1,
+            version: 6,
             ...config
         }
 
