@@ -186,7 +186,7 @@ export class ErrorPlugin extends Plugin {
 
         // 触发录制（如果启用）
         if (this.config.enableRecordTrigger && this.recordPlugin && options.isRecord) {
-            const recordSessionId = this.recordPlugin.errorTrigger(errorInfo.id);
+            const recordSessionId = await this.recordPlugin.errorTrigger(errorInfo.id);
 
             // 将录制会话ID关联到错误信息
             if (recordSessionId) {

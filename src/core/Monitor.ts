@@ -55,8 +55,6 @@ export class Monitor {
                 },
             ]
         })
-
-        console.info(`WebEye init 2`);
     }
 
     /**

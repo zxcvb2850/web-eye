@@ -73,12 +73,10 @@ export class ConsolePlugin extends Plugin {
             warn: console.warn,
             error: console.error,
         };
-
-        console.info("ConsolePlugin init");
     }
 
     protected async init(): Promise<void> {
-        this.logger.log(`Init LoggerPlugin`);
+        this.logger.log(`Init ConsolePlugin`);
 
         try {
             // 初始化数据库

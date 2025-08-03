@@ -166,7 +166,6 @@ export class IndexedDBManager {
 
     // 查询所有数据
     async getAll<T = any>(storeName: string): Promise<T[]> {
-        console.info('indexedDB getAll');
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
