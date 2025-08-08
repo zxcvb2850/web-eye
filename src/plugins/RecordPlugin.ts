@@ -233,7 +233,7 @@ export class RecordPlugin extends Plugin {
                 url: false
             },
             recordCanvas: true,      // 启用canvas录制
-            recordCrossOriginIframes: true,
+            recordCrossOriginIframes: false,
             collectFonts: true,      // 收集字体，避免样式问题
             sampling: {
                 scroll: 500,
