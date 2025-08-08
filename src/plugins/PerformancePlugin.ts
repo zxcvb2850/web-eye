@@ -5,17 +5,39 @@ import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
 import { onCLS, onFCP, onINP, onLCP, onTTFB } from "web-vitals";
 
+interface PerformanceConfig {
+    isOpenLCP?: boolean;
+    isOpenINP?: boolean;
+    isOpenFCP?: boolean;
+    isOpenCLS?: boolean;
+    isOpenTTFB?: boolean;
+}
+
 export class PerformancePlugin extends Plugin {
     name = 'PerformancePlugin';
+
+    private config: PerformanceConfig = {
+        isOpenLCP: true,
+        isOpenINP: true,
+        isOpenFCP: true,
+        isOpenCLS: true,
+        isOpenTTFB: true,
+    };
+
+    constructor(config: Partial<PerformanceConfig>) {
+        super();
+        this.config = { ...this.config, ...config };
+    }
+
 
     protected init(): void {
         this.logger.log('Init PerformancePlugin');
 
-        this.collectLCP();
-        this.collectINP();
-        this.collectFCP();
-        this.collectCLS();
-        this.collectTTFB();
+        this.config.isOpenLCP && this.collectLCP();
+        this.config.isOpenINP && this.collectINP();
+        this.config.isOpenFCP && this.collectFCP();
+        this.config.isOpenCLS && this.collectCLS();
+        this.config.isOpenTTFB && this.collectTTFB();
     }
 
     protected destroy(): void {
