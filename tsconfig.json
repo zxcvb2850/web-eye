@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "lib": ["dom", "es2015"],
+        "lib": ["dom", "es2015", "WebWorker"],
         "target": "ES2020",
         "module": "ESNext",
         "moduleResolution": "Node",

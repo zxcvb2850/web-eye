@@ -137,7 +137,7 @@ export class IndexedDBManager {
     }
 
     // 更新数据
-    async put<T = any>(storeName: string,data: T): Promise<IDBValidKey> {
+    async put<T = any>(storeName: string, data: T): Promise<IDBValidKey> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
@@ -165,13 +165,22 @@ export class IndexedDBManager {
     }
 
     // 查询所有数据
-    async getAll<T = any>(storeName: string): Promise<T[]> {
+    async getAll<T = any>(storeName: string, dbIndex?: string, filter?: string): Promise<T[]> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([storeName], "readonly");
             const store = transaction.objectStore(storeName);
-            const request = store.getAll();
+            let index: IDBIndex | undefined;
+            if (dbIndex) {
+                index = store.index(dbIndex);
+            }
+            let request: IDBRequest<T[]>;
+            if (filter) {
+                request = index ? index.getAll(filter) : store.getAll(filter);
+            } else {
+                request = index ? index.getAll() : store.getAll();
+            }
 
             request.onsuccess  = () => resolve(request.result);
             request.onerror = () => reject(request.error);
