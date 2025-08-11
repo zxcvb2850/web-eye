@@ -3,6 +3,7 @@ import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
 import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
 import { addEventListener } from "../utils/helpers";
 import {Logger} from "./Logger";
+import { loadWorker } from "../workers/loadWorker";
 
 /**
  * 数据上报器
@@ -13,6 +14,7 @@ export class Reporter implements IReporter {
     private queue: BaseMonitorData[] = [];
     private timer: NodeJS.Timeout | null = null;
     private isReporting = false;
+    private worker: Worker | null = null;
 
     // sendBeacon 数据大小限制（通常为64KB）
     private readonly BEACON_SIZE_LIMIT = 64 * 1024;
@@ -23,6 +25,14 @@ export class Reporter implements IReporter {
         this.config = config;
         this.logger = new Logger(this.config);
         this.bindBeforeUnload();
+        this.init();
+    }
+
+    init() {
+        // 使用示例
+        const w = loadWorker();
+        w.onmessage = e => console.info('主线程收到:', e.data);
+        w.postMessage('Hello from SDK');
     }
 
     /**
