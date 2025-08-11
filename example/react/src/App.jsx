@@ -11,7 +11,7 @@ function App() {
     const [obj] = useState({a: 1, b: {c: 2}})
 
     useEffect(() => {
-        window.monitor.updateConfigExtends("source", 1);
+        window?.monitor?.updateConfigExtends?.("source", 1);
     }, [])
 
     const handleClick = () => {

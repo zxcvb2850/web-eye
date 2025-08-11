@@ -3,19 +3,10 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from "./components/ErrorBoundary/index.js";
-import {Monitor} from '../../../src/core/Monitor';
-import {ConsolePlugin} from "../../../src/plugins/ConsolePlugin.ts";
-import {RequestPlugin} from "../../../src/plugins/RequestPlugin.js";
-import {ResourcePlugin} from "../../../src/plugins/ResourcePlugin.js";
-import {CustomPlugin} from "../../../src/plugins/CustomPlugin.ts";
-import {ErrorPlugin} from "../../../src/plugins/ErrorPlugin.js";
-import {WhiteScreenPlugin} from "../../../src/plugins/WhiteScreenPlugin.js";
-import {PerformancePlugin} from "../../../src/plugins/PerformancePlugin.js";
-import {RecordPlugin} from "../../../src/plugins/RecordPlugin.js";
+import { Monitor, ConsolePlugin, WhiteScreenPlugin, CustomPlugin, PerformancePlugin, RequestPlugin, ResourcePlugin, ErrorPlugin, RecordPlugin } from '../../../dist/index';
 
 const monitor = new Monitor({
-    debug: false,
-    logLevel: 0,
+    debug: true,
     appKey: "684a798724dd89c2252dc797",
     reportUrl: "http://localhost:8989/a/r",
     extends: {
