@@ -1,6 +1,6 @@
-import {strToU8, gzipSync} from "fflate";
+import {strToU8} from "fflate";
 import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
-import {getPageVisibility, safeJsonStringify, sleep} from "../utils/common";
+import {getPageVisibility, safeJsonStringify, sleep, compressData} from "../utils/common";
 import { addEventListener } from "../utils/helpers";
 import {Logger} from "./Logger";
 import { loadWorker } from "../workers/loadWorker";
@@ -29,10 +29,7 @@ export class Reporter implements IReporter {
     }
 
     init() {
-        // 使用示例
-        const w = loadWorker();
-        w.onmessage = e => console.info('主线程收到:', e.data);
-        w.postMessage('Hello from SDK');
+        this.worker = loadWorker(this.config);
     }
 
     /**
@@ -96,44 +93,6 @@ export class Reporter implements IReporter {
     }
 
     /**
-     * 压缩数据
-     * */
-    private compressData(data: string): { compressed: Uint8Array, isCompressed: boolean } {
-        try {
-            // 检查是否需要压缩数据
-            if (data.length < this.COMPRESS_THRESHOLD) {
-                return {
-                    compressed: strToU8(data),
-                    isCompressed: false,
-                }
-            }
-
-            // gzip 压缩数据
-            // const compressed = gzipSync(strToU8(data));
-            const compressed = strToU8(data);
-
-            // 如果压缩后的数据比原始更大，则使用原始数据进行上报
-            // if (compressed.length > data.length) {
-            //     return {
-            //         compressed: strToU8(data),
-            //         isCompressed: false,
-            //     }
-            // }
-
-            return {
-                compressed,
-                isCompressed: false,
-            }
-        } catch (error) {
-            console.error(`Failed to compress data ====> ${error}`);
-            return {
-                compressed: strToU8(data),
-                isCompressed: false,
-            }
-        }
-    }
-
-    /**
      * 检查数据是否适合使用 sendBeacon
      * */
     private canUseSendBeacon(dataSize: number, dataLength: number): boolean {
@@ -160,10 +119,29 @@ export class Reporter implements IReporter {
      * */
     private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
         try {
-            const jsonData = safeJsonStringify(data);
-            const { compressed, isCompressed } = this.compressData(jsonData);
-            let isMaxBody = false;
+            // 如果浏览器支持 Worker，使用 Worker 发送
+            if (this.worker?.postMessage) {
+                for (let i = 0; i < data.length; i++) {
+                    const result = data[i];
+                    this.worker?.postMessage({ type: "log", data: result });
+                }
+                return true;
+            }
 
+            // 1. 不支持 worker
+            // 2. 使用 sendBeacon 发送
+            // 2. 使用 fetch 发送
+            const jsonData = safeJsonStringify(data);
+            let compressed = strToU8(jsonData);
+            let isCompressed = false;
+            // 检查是否需要压缩数据
+            if (jsonData.length < this.COMPRESS_THRESHOLD) {
+            } else {
+                const data = compressData(jsonData);
+                compressed = data.compressed;
+                isCompressed = data.isCompressed;
+            }
+            let isMaxBody = false;
             // 如果数据量过大，则使用分批发送
             if (compressed.length > this.BEACON_SIZE_LIMIT) {
                 this.logger.log('Large data detected, sending in batches');
@@ -171,7 +149,6 @@ export class Reporter implements IReporter {
                 // return false;
             }
 
-            console.info('canUseSendBeacon', this.canUseSendBeacon(compressed.length, data.length));
             // 尝试使用 sendBeacon API 发送数据
             if (this.canUseSendBeacon(compressed.length, data.length)) {
                 const blob = new Blob([compressed], {
@@ -203,7 +180,6 @@ export class Reporter implements IReporter {
                 body,
                 keepalive: !isMaxBody,
             })
-            console.info('request', request);
             return request.ok;
         } catch (error) {
             this.logger.error('Send batch error ====> ', error);
@@ -263,11 +239,6 @@ export class Reporter implements IReporter {
         addEventListener(window, 'beforeunload', () => {
             if (this.queue.length > 0) {
                 this.sendRequest(this.queue);
-                // 使用 sendBeacon 或同步请求发送数据
-                /*navigator.sendBeacon(
-                    this.config.reportUrl,
-                    safeJsonStringify(this.queue),
-                )*/
             }
         })
 

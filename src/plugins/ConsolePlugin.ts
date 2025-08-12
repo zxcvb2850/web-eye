@@ -1,6 +1,6 @@
 import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
-import {IndexedDBManager} from "../utils/indexedDBManager";
+import { IndexedDBManager } from "../utils/indexedDBManager";
 
 /**
  * 日志等级枚举

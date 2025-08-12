@@ -1,5 +1,6 @@
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import {NetworkInfo} from "../types";
+import {strToU8, gzipSync} from "fflate";
 
 /**
  * 获取浏览器指纹
@@ -251,6 +252,9 @@ export function getNetworkInfo(): NetworkInfo | null {
  * */
 export function isSupported(api: string): boolean {
     try {
+        if (typeof self !== "undefined") {
+            return api in self;
+        }
         return api in window;
     } catch (e) {
         return false;
@@ -262,4 +266,33 @@ export function isSupported(api: string): boolean {
  * */
 export function isObject(variable: any): boolean {
     return variable !== null && typeof variable === 'object' && Object.prototype.toString.call(variable) === '[object Object]';
+}
+
+/**
+ * 压缩上报数据
+ */
+export function compressData(data: string): { compressed: Uint8Array, isCompressed: boolean } {
+    try {
+        // gzip 压缩数据
+        const compressed = gzipSync(strToU8(data));
+
+        // 如果压缩后的数据比原始更大，则使用原始数据进行上报
+        // if (compressed.length > data.length) {
+        //     return {
+        //         compressed: strToU8(data),
+        //         isCompressed: false,
+        //     }
+        // }
+
+        return {
+            compressed,
+            isCompressed: true,
+        }
+    } catch (error) {
+        console.error(`Failed to compress data ====> ${error}`);
+        return {
+            compressed: strToU8(data),
+            isCompressed: false,
+        }
+    }
 }

@@ -1,6 +1,11 @@
+import { WebEyeConfig } from "../types";
 import workerCode from './worker.inline';
 
-export function loadWorker() {
+export function loadWorker(config: WebEyeConfig) {
     const blob = new Blob([workerCode], { type: 'application/javascript' });
-    return new Worker(URL.createObjectURL(blob));
+    const worder = new Worker(URL.createObjectURL(blob));
+
+    worder.postMessage({type: "init", data: config});
+
+    return worder;
 }

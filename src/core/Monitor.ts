@@ -24,8 +24,6 @@ export class Monitor {
         this.logger = new Logger(this.config);
         this.reporter = new Reporter(this.config);
         this.visitorId = localStorage.getItem('_eye_visitor_id_') || null;
-
-        this.init();
     }
 
     private async init() {
@@ -34,7 +32,7 @@ export class Monitor {
 
         // 创建indexedDB
         new IndexedDBManager({
-            version: 5,
+            version: 6,
             storeNames: [
                 {
                     name: 'logs',
@@ -51,6 +49,15 @@ export class Monitor {
                     indexes: [
                         { name: 'sessionId', keyPath: 'id', unique: true },
                         { name: 'timestamp', keyPath: 'timestamp', unique: false },
+                    ]
+                },
+                {
+                    name: 'workers',
+                    keyPath: 'id',
+                    indexes: [
+                        { name: 'createAt', keyPath: 'createAt', unique: false },
+                        { name: 'retryCount', keyPath: 'retryCount', unique: false },
+                        { name: 'status', keyPath: 'status', unique: false },
                     ]
                 },
             ]

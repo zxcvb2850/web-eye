@@ -59,7 +59,7 @@ export class CustomPlugin extends Plugin {
     /**
      * 自定义上报
      * */
-    public customReport(event: string, data: CustomReportData, options: ReportOptions = {}): { success: boolean; reportId: string | null } {
+    public async customReport(event: string, data: CustomReportData, options: ReportOptions = {}): Promise<{ success: boolean; reportId: string | null }> {
         try {
             if (!event) {
                 throw new Error("Custom report event is required");
@@ -67,7 +67,7 @@ export class CustomPlugin extends Plugin {
             const reportId = data?.id || generateId();
 
             const content = this.serializeContent(data);
-            const reportOtherData = this.prepareReportData(options, reportId);
+            const reportOtherData = await this.prepareReportData(options, reportId);
 
             this.report({
                 type: MonitorType.CUSTOM,
@@ -96,7 +96,7 @@ export class CustomPlugin extends Plugin {
     /**
      * 自定义上报携带其他数据
      * */
-    private prepareReportData(options: ReportOptions, reportId: string): CustomReportData & { behaviors?: any[] } {
+    private async prepareReportData(options: ReportOptions, reportId: string): Promise<CustomReportData & { behaviors?: any[] }> {
         const reportData: any = {};
 
         // 添加用户行为数据
@@ -111,7 +111,7 @@ export class CustomPlugin extends Plugin {
         // 上报用户录制
         if (options?.includeRecord && this.recordPlugin) {
             try {
-                reportData.recordId = this.recordPlugin.customTrigger(reportId);
+                reportData.recordId = await this.recordPlugin.customTrigger(reportId);
             } catch (error) {
                 this.logger.warn(`Add user record failed ====>`, error);
             }

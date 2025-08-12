@@ -31,11 +31,9 @@ export class IndexedDBManager {
             return IndexedDBManager.instance;
         }
 
-        if (!config) {
-            throw new Error("config is required");   
-        }
         this.config = {
             version: 6,
+            storeNames: [],
             ...config
         }
 
@@ -71,30 +69,32 @@ export class IndexedDBManager {
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                // 创建或更新 stores
-                // 删除已存在的 store
-                this.config!.storeNames.forEach(item => {
-                    if (db.objectStoreNames.contains(item.name)) {
-                        db.deleteObjectStore(item.name);
-                    }
+                if (this.config?.storeNames) {
+                    // 创建或更新 stores
+                    // 删除已存在的 store
+                    this.config!.storeNames.forEach(item => {
+                        if (db.objectStoreNames.contains(item.name)) {
+                            db.deleteObjectStore(item.name);
+                        }
 
-                    // 创建 store
-                    const store = db.createObjectStore(item.name, {
-                        keyPath: item.keyPath || "id",
-                        autoIncrement: item.autoIncrement ?? true,
-                    })
-
-                    // 创建索引
-                    if (item.indexes?.length) {
-                        item.indexes.forEach(index => {
-                            store.createIndex(
-                                index.name,
-                                index.keyPath,
-                                { unique: index.unique ?? false }
-                            )
+                        // 创建 store
+                        const store = db.createObjectStore(item.name, {
+                            keyPath: item.keyPath || "id",
+                            autoIncrement: item.autoIncrement ?? true,
                         })
-                    }
-                })
+
+                        // 创建索引
+                        if (item.indexes?.length) {
+                            item.indexes.forEach(index => {
+                                store.createIndex(
+                                    index.name,
+                                    index.keyPath,
+                                    { unique: index.unique ?? false }
+                                )
+                            })
+                        }
+                    })
+                }
             }
         })
     }
@@ -137,15 +137,21 @@ export class IndexedDBManager {
     }
 
     // 更新数据
-    async put<T = any>(storeName: string, data: T): Promise<IDBValidKey> {
+    async put<T = any>(storeName: string, logId: IDBValidKey, data: T): Promise<IDBValidKey> {
         this.ensureDB();
 
         return new Promise((resolve, reject) => {
             const transaction = this.db!.transaction([storeName], "readwrite");
             const store = transaction.objectStore(storeName);
-            const request = store.put(data);
+            const request = store.get(logId);
 
-            request.onsuccess  = () => resolve(request.result);
+            request.onsuccess  = () => {
+                const log = request.result;
+                if (log) {
+                    store.put({ ...log, ...data });
+                }
+                resolve(request.result)
+            };
             request.onerror = () => reject(request.error);
         })
     }
