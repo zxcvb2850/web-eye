@@ -180,6 +180,10 @@ export class Reporter implements IReporter {
                 body,
                 keepalive: !isMaxBody,
             })
+            if (!request.ok) {
+                this.logger?.log?.(`report log success: ${data.length}`);
+            }
+            
             return request.ok;
         } catch (error) {
             this.logger.error('Send batch error ====> ', error);

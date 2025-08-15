@@ -7,6 +7,7 @@ export type LogStatus = "pending" | "success" | "failed";
 
 export interface WorkerConfig {
     maxRetry: number;
+    maxCacheCount: number;
     retryDelay: number;
 }
 
@@ -32,6 +33,7 @@ export interface WorkerResponse {
 class MainWorker {
     private config: WorkerConfig = {
         maxRetry: 3,
+        maxCacheCount: 200,
         retryDelay: 60000,
     };
     private globalConfig: WorkerAndWebEyeConfig | null = null;
@@ -106,13 +108,12 @@ class MainWorker {
 
     // 上报日志
     private async reportLog(data: StoredLogEntry, id?: IDBValidKey | undefined): Promise<void> {
-        console.info("worker reportLog", data, this.db?.loaded || false, this.globalConfig?.reportUrl || false);
         if (!this.db?.loaded) return;
         if (!this.globalConfig?.reportUrl) return;
 
         try {
             const {id, ...rest} = data;
-            const jsonData = safeJsonStringify(rest);
+            const jsonData = safeJsonStringify({...rest, "x-page-url": `${location.origin}`});
             const {compressed, isCompressed} = compressData(jsonData);
             // 使用 fetch API 发送数据
             const headers: Record<string, string> = {
@@ -120,14 +121,19 @@ class MainWorker {
                 'EyeLogTag': '1', // 标记为内部请求
             }
             let body: string|Blob = jsonData;
-            if (isCompressed) {
+            if (!this.globalConfig.debug && isCompressed) {
                 headers['Content-Encoding'] = 'gzip';
                 headers['Content-Type'] = 'application/gzip';
                 body = new Blob([compressed], {
                     type: isCompressed ? 'application/gzip' : 'application/json',
                 });
             }
-            const response = await fetch(`${this.globalConfig.reportUrl}/w`, {
+            
+            let url = this.globalConfig.reportUrl;
+            if (!this.globalConfig.reportUrl.includes('http')) {
+                url = `${location.origin}${this.globalConfig.reportUrl}`
+            }
+            const response = await fetch(`${url}/w`, {
                 method: 'POST',
                 headers,
                 body,
@@ -135,6 +141,7 @@ class MainWorker {
             })
 
             if (response.ok) {
+                this.logger?.log?.(`report log success: ${data.type}`);
                 // 上报成功，清理日志
                 id && await this.db?.delete(this.dbStoreName, id);
             } else  {
@@ -153,7 +160,11 @@ class MainWorker {
                 });
             } else {
                 // 不能存在则保存
-                await this.db?.add(this.dbStoreName, data);
+                const count = await this.db?.count(this.dbStoreName);
+                if (count > this.config.maxCacheCount) {
+                    // 当失败的日志数量大于 maxCacheCount ,则不缓存数据
+                    await this.db?.add(this.dbStoreName, data);
+                }
             }
         }
     }
