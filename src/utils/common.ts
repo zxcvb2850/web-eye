@@ -59,18 +59,6 @@ export const getUuid = (): string => {
 };
 
 /**
- * 生成会话ID
- */
-export function generateSessionId(): string {
-    let sessionId = sessionStorage.getItem('_eye_session_id_');
-    if (!sessionId) {
-        sessionId = generateId();
-        sessionStorage.setItem('_eye_session_id_', sessionId);
-    }
-    return sessionId;
-}
-
-/**
  * 节流函数
  * */
 export function throttle<T extends (...args: any[]) => any>(

@@ -32,7 +32,7 @@ export class IndexedDBManager {
         }
 
         this.config = {
-            version: 6,
+            version: 7,
             storeNames: [],
             ...config
         }

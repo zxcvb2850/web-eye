@@ -1,6 +1,9 @@
 import { defineConfig } from 'tsup'
 import * as esbuild from 'esbuild';
 import * as path from 'path';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 
 function inlineWorkerPlugin(): esbuild.Plugin {
     return {
@@ -35,7 +38,7 @@ export default defineConfig({
     format: ['esm', 'cjs', 'iife'], // 关键：三种格式
     globalName: 'WebEyeLogs',    // IIFE 暴露为 window.WebMonitorSDK
     dts: true,                      // ESM 用户可获得类型支持
-    outDir: 'dist',
+    outDir: `dist/v${pkg.version}`,
     minify: true,
     clean: true,
     target: 'es2017',

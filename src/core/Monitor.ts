@@ -1,7 +1,7 @@
 import {BaseMonitorData, IPlugin, MonitorData, WebEyeConfig} from "../types";
 import {Reporter} from "./Reporter";
 import {Logger} from "./Logger";
-import {generateSessionId, getFingerprint} from "../utils/common";
+import {generateId, getFingerprint} from "../utils/common";
 import {IndexedDBManager} from "../utils/indexedDBManager";
 import {getDeviceInfo} from "../utils/device";
 import { version } from '../../package.json';
@@ -20,10 +20,12 @@ export class Monitor {
 
     constructor(config: WebEyeConfig) {
         this.config = this.mergeConfig(config);
-        this.sessionId = generateSessionId();
+        this.sessionId = generateId();
         this.logger = new Logger(this.config);
         this.reporter = new Reporter(this.config);
         this.visitorId = localStorage.getItem('_eye_visitor_id_') || null;
+
+        this.init();
     }
 
     private async init() {
@@ -32,7 +34,6 @@ export class Monitor {
 
         // 创建indexedDB
         new IndexedDBManager({
-            version: 6,
             storeNames: [
                 {
                     name: 'logs',
@@ -232,7 +233,7 @@ export class Monitor {
      * 重新生成会话ID
      * */
     regenerateSessionId(): string {
-        this.sessionId = generateSessionId();
+        this.sessionId = generateId();
         return this.sessionId;
     }
 

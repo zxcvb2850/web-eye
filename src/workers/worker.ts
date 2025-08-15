@@ -94,11 +94,8 @@ class MainWorker {
                 createAt: Date.now(),
             };
 
-            // 保存日志 indexedDB
-            const id = await this.db?.add(this.dbStoreName, logData);
-
             // 立即上报
-            await this.reportLog(logData, id);
+            await this.reportLog(logData);
 
             // 清理旧日志
             await this.cleanupOldLogs();
@@ -108,10 +105,10 @@ class MainWorker {
     }
 
     // 上报日志
-    private async reportLog(data: StoredLogEntry, id: IDBValidKey | undefined): Promise<void> {
+    private async reportLog(data: StoredLogEntry, id?: IDBValidKey | undefined): Promise<void> {
+        console.info("worker reportLog", data, this.db?.loaded || false, this.globalConfig?.reportUrl || false);
         if (!this.db?.loaded) return;
         if (!this.globalConfig?.reportUrl) return;
-        if (!id) throw new Error("ID not found");
 
         try {
             const {id, ...rest} = data;
@@ -138,13 +135,8 @@ class MainWorker {
             })
 
             if (response.ok) {
-                // 上报成功状态
-                await this.db?.put(this.dbStoreName, id, {
-                    status: "success",
-                    updateAt: Date.now()
-                });
                 // 上报成功，清理日志
-                await this.db?.delete(this.dbStoreName, id);
+                id && await this.db?.delete(this.dbStoreName, id);
             } else  {
                 throw new Error(`上报失败： ${response.status} ${response.statusText}`);
             }
@@ -152,11 +144,17 @@ class MainWorker {
             const errorMessage = error instanceof Error ? error.message : String(error);
             this.logger?.error?.("Failed to report log:", errorMessage);
 
-            await this.db?.put(this.dbStoreName, id, {
-                status: "failed",
-                retryCount: data.retryCount + 1,
-                updateAt: Date.now()
-            });
+            if (id) {
+                // 存在则更新
+                await this.db?.put(this.dbStoreName, id, {
+                    status: "failed",
+                    retryCount: data.retryCount + 1,
+                    updateAt: Date.now()
+                });
+            } else {
+                // 不能存在则保存
+                await this.db?.add(this.dbStoreName, data);
+            }
         }
     }
 
