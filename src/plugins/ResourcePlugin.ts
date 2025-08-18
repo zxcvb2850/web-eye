@@ -50,7 +50,6 @@ export class ResourcePlugin extends Plugin {
         this.logger.log("Init ResourcePlugin");
 
         this.interceptResourceErrors();
-        this.monitorResourcePerformance();
     }
 
     protected destroy() : void {
@@ -116,47 +115,6 @@ export class ResourcePlugin extends Plugin {
     }
 
     /**
-     * 监控资源性能（用于检测超时等问题）
-     * */
-    private monitorResourcePerformance(): void {
-        if (!window.PerformanceObserver) return;
-
-        const _this = this;
-
-        try {
-            this.performanceObserver = new PerformanceObserver((list) => {
-                _this.safeExecute(() => {
-                    const entries = list.getEntries();
-
-                    entries.forEach((entry) => {
-                        if (entry.entryType === 'resource') {
-                            const resourceEntry = entry as PerformanceResourceTiming;
-
-                            // 检查是否有异常的资源加载时间
-                            const isTimeout = _this.isResourceTimeout(resourceEntry);
-                            const isSlowLoading = _this.isSlowLoading(resourceEntry);
-
-                            if (isTimeout || isSlowLoading) {
-                                const resourceError = _this.parsePerformanceResourceError(resourceEntry, isTimeout);
-                                if (resourceError && _this.shouldMonitorResource(resourceError.path)) {
-                                    _this.report({
-                                        type: MonitorType.RESOURCE,
-                                        data: resourceError
-                                    });
-                                }
-                            }
-                        }
-                    });
-                });
-            });
-
-            this.performanceObserver.observe({ entryTypes: ['resource'] });
-        } catch (error) {
-            this.logger.warn('Failed to create PerformanceObserver:', error);
-        }
-    }
-
-    /**
      * 解析资源错误信息
      */
     private parseResourceError(target: HTMLElement, event: Event): ResourceErrorData | null {
@@ -216,32 +174,6 @@ export class ResourcePlugin extends Plugin {
                 errorMessage: errorMessage.substring(0, 200)
             };
         } catch (err) {
-            return null;
-        }
-    }
-
-    /**
-     * 解析性能监控中的资源错误
-     */
-    private parsePerformanceResourceError(entry: PerformanceResourceTiming, isTimeout: boolean): ResourceErrorData | null {
-        try {
-            const url = entry.name;
-            const resourceType = this.getResourceTypeFromUrl(url);
-            const errorType = isTimeout ? ResourceErrorType.TIMEOUT : ResourceErrorType.NETWORK;
-
-            return {
-                path: url,
-                resourceType,
-                errorType,
-                tagName: 'performance',
-                outerHTML: '',
-                timestamp: Date.now(),
-                isFromCache: entry.transferSize === 0 && entry.decodedBodySize > 0,
-                loadTime: entry.duration,
-                transferSize: entry.transferSize,
-                decodedBodySize: entry.decodedBodySize
-            };
-        } catch (error) {
             return null;
         }
     }

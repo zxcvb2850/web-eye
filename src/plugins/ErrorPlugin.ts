@@ -220,15 +220,21 @@ export class ErrorPlugin extends Plugin {
      * 处理React错误（由用户调用此API）
      */
     public handleReactError(error: Error, errorInfo: any, props?: any): void {
-        this.safeExecute(() => {
+        this.safeExecute(async () => {
+            const originalStack = await this.parseSourceMap(errorInfo.componentStack);
+            if (Array.isArray(originalStack) && originalStack?.length) {
+                const firstStack = originalStack[0];
+                errorInfo.lineno = firstStack.lineno;
+                errorInfo.colno = firstStack.colno;
+                errorInfo.filename = firstStack.filename;
+            }
+
             const errorInfoObj: ErrorInfo = {
                 id: generateId(),
                 type: ErrorType.REACT_ERROR,
                 message: error.message,
-                stack: error.stack,
-                componentStack: errorInfo.componentStack,
+                stack: errorInfo.componentStack,
                 props: this.serializeProps(props),
-                errorInfo,
             };
 
             this.processError(errorInfoObj);
