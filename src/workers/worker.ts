@@ -161,7 +161,7 @@ class MainWorker {
             } else {
                 // 不能存在则保存
                 const count = await this.db?.count(this.dbStoreName);
-                if (count > this.config.maxCacheCount) {
+                if (count < this.config.maxCacheCount) {
                     // 当失败的日志数量大于 maxCacheCount ,则不缓存数据
                     await this.db?.add(this.dbStoreName, data);
                 }
