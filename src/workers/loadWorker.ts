@@ -1,15 +1,21 @@
 import { WebEyeConfig } from "../types";
 import workerCode from './worker.inline';
 
-export function loadWorker(config: WebEyeConfig) {
+export function isWorkerSupported() {
+    return typeof Worker !== 'undefined';
+}
+
+export function loadWorker(config?: WebEyeConfig) {
     // 判断是否支持 Worker
-    if (typeof Worker === 'undefined') {
+    if (!isWorkerSupported()) {
         return null;
     }
     const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const worder = new Worker(URL.createObjectURL(blob));
+    const worded = new Worker(URL.createObjectURL(blob));
 
-    worder.postMessage({type: "init", data: config});
+    if (config) {
+        worded.postMessage({type: "init", data: config});
+    }
 
-    return worder;
+    return worded;
 }

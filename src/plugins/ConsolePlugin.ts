@@ -115,8 +115,8 @@ export class ConsolePlugin extends Plugin {
                 // 记录日志 不受等级影响
                 // 但受 recordInConsole 影响
                 if (
-                    this.config.recordInConsole && 
-                    !(Array.isArray(this.config.recordInConsole) && this.config.recordInConsole.includes(name)) && 
+                    !!this.config.recordInConsole &&
+                    (!Array.isArray(this.config.recordInConsole) || (Array.isArray(this.config.recordInConsole) && this.config.recordInConsole.includes(name))) &&
                     !this.shouldIgnoreLog(args)
                 ) {
                     this.recordLog(level, name, args);

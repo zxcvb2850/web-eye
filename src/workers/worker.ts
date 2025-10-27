@@ -45,7 +45,7 @@ class MainWorker {
 
     constructor() {
         // 初始化数据库
-        this.db = new IndexedDBManager();
+        this.db = new IndexedDBManager()
     }
 
     private async init(config: WorkerAndWebEyeConfig): Promise<void> {

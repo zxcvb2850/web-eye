@@ -21,15 +21,20 @@ export class Reporter implements IReporter {
     // 压缩阈值，超过此大小才进行压缩
     private readonly COMPRESS_THRESHOLD = 1024;
 
-    constructor(config: WebEyeConfig) {
+    constructor(
+        config: WebEyeConfig,
+        logger: Logger,
+        worker?: Worker | null
+    ) {
         this.config = config;
-        this.logger = new Logger(this.config);
+        this.logger = logger;
+        if (worker) this.worker = worker;
         this.bindBeforeUnload();
         this.init();
     }
 
     init() {
-        this.worker = loadWorker(this.config);
+        // this.worker = loadWorker();
     }
 
     /**

@@ -2,7 +2,7 @@
 import {isSupported} from "./common";
 
 interface IndexedDBConfig {
-    version?: number; // 版本号默认为1
+    version: number; // 版本号默认为1
     storeNames: {
         name: string; // store名
         keyPath?: string; // 主键
@@ -17,6 +17,35 @@ interface IndexedDBConfig {
 
 const DB_NAME = "WebEyeLogger";
 
+export const defaultStoreNames = [
+    {
+        name: 'logs',
+        keyPath: 'id',
+        autoIncrement: true,
+        indexes: [
+            { name: 'timestamp', keyPath: 'timestamp', unique: false },
+            { name: 'level', keyPath: 'level', unique: false }
+        ]
+    },
+    {
+        name: 'records',
+        keyPath: 'id',
+        indexes: [
+            { name: 'sessionId', keyPath: 'id', unique: true },
+            { name: 'timestamp', keyPath: 'timestamp', unique: false },
+        ]
+    },
+    {
+        name: 'workers',
+        keyPath: 'id',
+        indexes: [
+            { name: 'createAt', keyPath: 'createAt', unique: false },
+            { name: 'retryCount', keyPath: 'retryCount', unique: false },
+            { name: 'status', keyPath: 'status', unique: false },
+        ]
+    },
+];
+
 /**
  * IndexedDB管理类
  * */
@@ -26,21 +55,21 @@ export class IndexedDBManager {
     private config?: IndexedDBConfig;
     loaded = false; // 数据库是否已加载
 
-    constructor(config?: IndexedDBConfig) {
+    constructor(config?: Omit<IndexedDBConfig, "version">) {
         if (IndexedDBManager.instance) {
             return IndexedDBManager.instance;
         }
 
         this.config = {
-            version: 8,
             storeNames: [],
-            ...config
+            ...config,
+            version: 10, // worker 公用数据库，所以不能将 version 设置为动态参数
         }
 
         if (!isSupported("indexedDB")) {
             throw new Error("浏览器不支持indexedDB");
         } else {
-            this.init();
+            config && this.init();
         }
 
         IndexedDBManager.instance = this;
@@ -55,7 +84,6 @@ export class IndexedDBManager {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, this.config!.version!);
 
-
             request.onerror = () => {
                 reject(new Error(`Failed to open IndexedDB: ${request.error}`));
             }
@@ -69,7 +97,7 @@ export class IndexedDBManager {
             request.onupgradeneeded = (event) => {
                 const db = (event.target as IDBOpenDBRequest).result;
 
-                if (this.config?.storeNames) {
+                if (this.config?.storeNames?.length) {
                     // 创建或更新 stores
                     // 删除已存在的 store
                     this.config!.storeNames.forEach(item => {

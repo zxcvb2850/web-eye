@@ -2,8 +2,9 @@ import {BaseMonitorData, IPlugin, MonitorData, WebEyeConfig} from "../types";
 import {Reporter} from "./Reporter";
 import {Logger} from "./Logger";
 import {generateId, getFingerprint} from "../utils/common";
-import {IndexedDBManager} from "../utils/indexedDBManager";
+import {defaultStoreNames, IndexedDBManager} from "../utils/indexedDBManager";
 import {getDeviceInfo} from "../utils/device";
+import {isWorkerSupported, loadWorker} from "../workers/loadWorker";
 import { version } from '../../package.json';
 
 /**
@@ -12,6 +13,7 @@ import { version } from '../../package.json';
 export class Monitor {
     private config: WebEyeConfig;
     private logger: Logger;
+    private worker: Worker | null = null;
     private reporter: Reporter;
     private plugins: Map<string, IPlugin> = new Map();
     private visitorId: string | null = null;
@@ -20,49 +22,24 @@ export class Monitor {
 
     constructor(config: WebEyeConfig) {
         this.config = this.mergeConfig(config);
-        this.sessionId = generateId();
         this.logger = new Logger(this.config);
-        this.reporter = new Reporter(this.config);
+        this.sessionId = generateId();
         this.visitorId = localStorage.getItem('_eye_visitor_id_') || null;
 
-        this.init();
+        new IndexedDBManager({storeNames: defaultStoreNames});
+        this.worker = loadWorker(this.config);
+        this.reporter = new Reporter(this.config, this.logger, this.worker);
+
+        this.init().then(res => {
+            this.logger.log("===> Monitor init success");
+        }).catch(err => {
+            this.logger.error("===> Monitor init error", err);
+        })
     }
 
     private async init() {
         // 获取指纹
         !this.visitorId && (this.visitorId = await getFingerprint());
-
-        // 创建indexedDB
-        new IndexedDBManager({
-            storeNames: [
-                {
-                    name: 'logs',
-                    keyPath: 'id',
-                    autoIncrement: true,
-                    indexes: [
-                        { name: 'timestamp', keyPath: 'timestamp', unique: false },
-                        { name: 'level', keyPath: 'level', unique: false }
-                    ]
-                },
-                {
-                    name: 'records',
-                    keyPath: 'id',
-                    indexes: [
-                        { name: 'sessionId', keyPath: 'id', unique: true },
-                        { name: 'timestamp', keyPath: 'timestamp', unique: false },
-                    ]
-                },
-                {
-                    name: 'workers',
-                    keyPath: 'id',
-                    indexes: [
-                        { name: 'createAt', keyPath: 'createAt', unique: false },
-                        { name: 'retryCount', keyPath: 'retryCount', unique: false },
-                        { name: 'status', keyPath: 'status', unique: false },
-                    ]
-                },
-            ]
-        })
     }
 
     /**
