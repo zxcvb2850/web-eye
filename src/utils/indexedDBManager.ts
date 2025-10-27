@@ -69,7 +69,7 @@ export class IndexedDBManager {
         if (!isSupported("indexedDB")) {
             throw new Error("浏览器不支持indexedDB");
         } else {
-            config && this.init();
+            this.init();
         }
 
         IndexedDBManager.instance = this;

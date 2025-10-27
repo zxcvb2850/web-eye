@@ -125,7 +125,7 @@ export class Reporter implements IReporter {
     private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
         try {
             // 如果浏览器支持 Worker，使用 Worker 发送
-            if (this.worker?.postMessage) {
+            if (!!this.worker?.postMessage) {
                 for (let i = 0; i < data.length; i++) {
                     const result = data[i];
                     this.worker?.postMessage({ type: "log", data: result });
