@@ -17,14 +17,8 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
-.history
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-# Wasm
-wasm-sdk-util/.idea
-wasm-sdk-util/pkg
-wasm-sdk-util/target
