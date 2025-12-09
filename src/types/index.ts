@@ -40,6 +40,7 @@ export interface BaseMonitorData {
     data: IAnyObject; // 所上报的数据
     deviceInfo: DeviceInfo; // 设备信息
     extends: ExtendInfo; // 拓展信息
+    retryCount?: number; // 重试次数
     [key: string]: any; // 其它
 }
 

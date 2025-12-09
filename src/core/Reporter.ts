@@ -1,9 +1,9 @@
-import {strToU8} from "fflate";
-import {BaseMonitorData, IReporter, WebEyeConfig} from "../types";
-import {getPageVisibility, safeJsonStringify, sleep, compressData} from "../utils/common";
+import { strToU8 } from "fflate";
+import { BaseMonitorData, IReporter, WebEyeConfig } from "../types";
+import { getPageVisibility, safeJsonStringify, sleep, compressData } from "../utils/common";
 import { addEventListener } from "../utils/helpers";
-import {Logger} from "./Logger";
-import { loadWorker } from "../workers/loadWorker";
+import { Logger } from "./Logger";
+import { IndexedDBManager } from "../utils/indexedDBManager";
 
 /**
  * 数据上报器
@@ -14,6 +14,8 @@ export class Reporter implements IReporter {
     private queue: BaseMonitorData[] = [];
     private timer: NodeJS.Timeout | null = null;
     private isReporting = false;
+    private db: IndexedDBManager | null = null;
+    private readonly dbStoreName = "report_fails";
     private worker: Worker | null = null;
 
     // sendBeacon 数据大小限制（通常为64KB）
@@ -33,8 +35,11 @@ export class Reporter implements IReporter {
         this.init();
     }
 
-    init() {
-        // this.worker = loadWorker();
+    async init() {
+        this.db = new IndexedDBManager()
+
+        // 启动时重试之前的失败的日志
+        await this.retryFailedLogs();
     }
 
     /**
@@ -122,7 +127,7 @@ export class Reporter implements IReporter {
     /**
      * 发送 HTTP 请求
      * */
-    private async sendRequest(data: BaseMonitorData[]): Promise<boolean> {
+    private async sendRequest(data: BaseMonitorData[], id?: IDBValidKey | undefined): Promise<boolean> {
         try {
             // 如果浏览器支持 Worker，使用 Worker 发送
             if (!!this.worker?.postMessage) {
@@ -185,11 +190,25 @@ export class Reporter implements IReporter {
                 body,
                 keepalive: !isMaxBody,
             })
-            if (!request.ok) {
+            if (request.ok) {
                 this.logger?.log?.(`report log success: ${data.length}`);
+                // 上报成功，清理日志
+                id && await this.db?.delete(this.dbStoreName, id);
+                return true;
+            } else {
+                if (id) {
+                    // 存在则更新
+                    await this.db?.put(this.dbStoreName, id, {
+                        status: "failed",
+                        retryCount: data.retryCount + 1,
+                        updateAt: Date.now()
+                    });
+                } else {
+                    this.logger.error(`上报失败： ${request.status} ${request.statusText}`);
+                    await this.db?.add(this.dbStoreName, data);
+                }
+                return false
             }
-            
-            return request.ok;
         } catch (error) {
             this.logger.error('Send batch error ====> ', error);
             return false;
@@ -238,6 +257,33 @@ export class Reporter implements IReporter {
                 resolve(false);
             }
         });
+    }
+
+    /**
+     * */
+    private async retryFailedLogs(): Promise<void> {
+        if (!this.db?.loaded) {
+            return
+        }
+        try {
+            const pendingLogs = await this.db?.getAll<BaseMonitorData>(this.dbStoreName, "status");
+
+            if (!pendingLogs || pendingLogs.length === 0) return;
+            for (const log of pendingLogs) {
+                if (log.status === "success" || (log?.retryCount && this.config?.maxRetry && log.retryCount >= this.config.maxRetry)) {
+                    // 删除已成功的日志和已达到最大重试次数的日志
+                    await this.db?.delete(this.dbStoreName, log.id);
+                } else {
+                    // 重试失败的日志
+                    await this.sendRequest([log], log.id);
+                }
+
+                // 避免并发请求过多，稍作延迟
+                await sleep(1000);
+            }
+        } catch (error) {
+            this.logger?.error?.("Failed to retry failed logs:", error);
+        }
     }
 
     /**

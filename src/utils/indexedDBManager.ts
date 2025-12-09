@@ -36,7 +36,7 @@ export const defaultStoreNames = [
         ]
     },
     {
-        name: 'workers',
+        name: 'report_fails',
         keyPath: 'id',
         indexes: [
             { name: 'createAt', keyPath: 'createAt', unique: false },

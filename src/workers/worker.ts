@@ -40,7 +40,7 @@ class MainWorker {
     private logger: Logger | null = null;
     private db: IndexedDBManager | null = null;
     private retryTimer: number | null = null;
-    private readonly dbStoreName = "workers";
+    private readonly dbStoreName = "report_fails";
     private retryDBCount = 0; // 刚启动时重试indexedDB状态次数
 
     constructor() {
@@ -112,8 +112,7 @@ class MainWorker {
         if (!this.globalConfig?.reportUrl) return;
 
         try {
-            const {id, ...rest} = data;
-            const jsonData = safeJsonStringify({...rest, "x-page-url": `${location.origin}`});
+            const jsonData = safeJsonStringify({...data, "x-page-url": `${location.origin}`});
             const {compressed, isCompressed} = compressData(jsonData);
             // 使用 fetch API 发送数据
             const headers: Record<string, string> = {
