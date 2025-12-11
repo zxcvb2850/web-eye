@@ -1,3 +1,7 @@
+import { WebEyeConfig, LogLevel, ExtendInfo } from "./config";
+
+export { WebEyeConfig, LogLevel, ExtendInfo };
+
 /**
  * 任意对象
  * */
@@ -12,24 +16,6 @@ export interface Callback {
     (original: any): any;
 }
 
-// 监控配置接口
-export interface WebEyeConfig  {
-    debug?: boolean;
-    appKey: string;
-    reportUrl: string;
-    logLevel: LogLevel;
-    maxRetry?: number; // 上报异常，最大重试次数
-    retryDelay?: number; // 上报异常，重试间隔
-    enableHash?: boolean;
-    enableHistory?: boolean;
-    whiteScreenThreshold?: number;
-    performanceThreshold?: number;
-    enableAutoReport?: boolean; // 是否定时上报
-    batchSize?: number;
-    flushInterval?: number; // 定时上报间隔
-    extends?: ExtendInfo; // 扩展信息
-}
-
 // 基础监控数据接口
 export interface BaseMonitorData {
     appKey: string; // 上报KEY
@@ -42,11 +28,6 @@ export interface BaseMonitorData {
     extends: ExtendInfo; // 拓展信息
     retryCount?: number; // 重试次数
     [key: string]: any; // 其它
-}
-
-// 扩展信息接口
-export interface ExtendInfo {
-    [key: string]: any;
 }
 
 //  监控数据类型枚举
@@ -93,7 +74,7 @@ export interface NetworkInfo {
 export interface RequestData extends BaseMonitorData {
     type: MonitorType.REQUEST;
     data: {
-        url: string;
+        url:string;
         method: string;
         status: number;
         duration: number;
@@ -144,17 +125,6 @@ export interface IPlugin {
 export interface IReporter {
     report(data: BaseMonitorData | BaseMonitorData[]): Promise<void>;
     flush(): Promise<void>;
-}
-
-/**
- * 日志等级枚举
- */
-export enum LogLevel {
-    DEBUG = 0,
-    LOG = 1,
-    WARN = 2,
-    ERROR = 3,
-    SILENT = 4, // 不输出任何日志
 }
 
 // 日志打印接口

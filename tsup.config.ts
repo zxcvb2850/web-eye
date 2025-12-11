@@ -1,44 +1,22 @@
 import { defineConfig } from 'tsup'
-import * as esbuild from 'esbuild';
-import * as path from 'path';
 import { readFileSync } from 'fs';
 
+// 从 package.json 读取信息
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
-
-function inlineWorkerPlugin(): esbuild.Plugin {
-    return {
-        name: 'inline-worker',
-        setup(build) {
-            build.onResolve({ filter: /\.inline$/ }, (args) => {
-                // 把 .inline 转成 .ts
-                const resolved = path.resolve(path.dirname(args.importer), args.path.replace(/\.inline$/, '.ts'));
-                return { path: resolved, namespace: 'inline-worker-ns' };
-            });
-
-            build.onLoad({ filter: /.*/, namespace: 'inline-worker-ns' }, async (args) => {
-                const result = await esbuild.build({
-                    entryPoints: [args.path],
-                    bundle: true,
-                    write: false,
-                    format: 'iife',
-                    target: 'es2020'
-                });
-                const code = result.outputFiles[0].text;
-                return { contents: `export default ${JSON.stringify(code)};`, loader: 'js' };
-            });
-        }
-    };
-}
 
 const isPro = process.env.NODE_ENV !== 'development';
 
 export default defineConfig({
     platform: 'browser',
     entry: ['src/index.ts'],
-    format: ['esm', 'cjs', 'iife'], // 关键：三种格式
-    globalName: 'WebEyeLogs',    // IIFE 暴露为 window.WebMonitorSDK
-    dts: true,                      // ESM 用户可获得类型支持
-    outDir: `dist/v${pkg.version}`,
+    // 打包三种格式
+    format: ['esm', 'cjs', 'iife'],
+    // 为 IIFE 格式指定全局变量名
+    globalName: 'WebEyeLogs',
+    // 生成类型声明文件
+    dts: true,
+    // 固定输出目录为 dist
+    outDir: 'dist',
     minify: true,
     clean: true,
     target: 'es2017',
@@ -47,10 +25,12 @@ export default defineConfig({
         options.minify = true;
 
         if (isPro) {
+            // 在生产构建中可以考虑移除 console 和 debugger
             // options.drop = ['console', 'debugger']
         }
 
         return options;
     },
-    esbuildPlugins: [inlineWorkerPlugin()],
+    // 不再需要自定义 worker 插件
+    // esbuildPlugins: [],
 })

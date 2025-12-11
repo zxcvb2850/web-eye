@@ -1,17 +1,29 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import {ViteSourcemapUploadPlugin} from "../../src/package/vite-sourcemap-upload-plugin.js";
+import { ViteSourcemapUploadPlugin } from "../../src/package/vite-sourcemap-upload-plugin.js";
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES Module 中获取 __dirname 的方法
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // https://vite.dev/config/
 export default defineConfig({
-  build: {
-    sourcemap: true,
-  },
-  plugins: [
-      react(),
-    ViteSourcemapUploadPlugin({
-        uploadUrl: 'http://localhost:8989/a/r/s',
-        appKey: '687642d809def077bf27d8c9',
-    }),
-  ],
+    build: {
+        sourcemap: true,
+    },
+    plugins: [
+        react(),
+        ViteSourcemapUploadPlugin({
+            uploadUrl: 'http://localhost:8989/a/r/s',
+            appKey: '687642d8-09de-f077-bf27-d8c9',
+        }),
+    ],
+    resolve: {
+        alias: {
+            // 设置别名，让示例项目能直接引用到 src 下的源码
+            'web-eye-logs': path.resolve(__dirname, '../../src/index.ts')
+        }
+    }
 })

@@ -16,7 +16,6 @@ export class Reporter implements IReporter {
     private isReporting = false;
     private db: IndexedDBManager | null = null;
     private readonly dbStoreName = "report_fails";
-    private worker: Worker | null = null;
 
     // sendBeacon 数据大小限制（通常为64KB）
     private readonly BEACON_SIZE_LIMIT = 64 * 1024;
@@ -25,12 +24,10 @@ export class Reporter implements IReporter {
 
     constructor(
         config: WebEyeConfig,
-        logger: Logger,
-        worker?: Worker | null
+        logger: Logger
     ) {
         this.config = config;
         this.logger = logger;
-        if (worker) this.worker = worker;
         this.bindBeforeUnload();
         this.init();
     }
@@ -71,34 +68,22 @@ export class Reporter implements IReporter {
 
         this.isReporting = true;
 
-        let retryCount = 0;
-        const maxRetry = this.config.maxRetry || 3;
-        const retryDelay = this.config.retryDelay || 1000;
-
-        while (retryCount < maxRetry) {
-            try {
-                const success = await this.sendRequest(data);
-
-                if (success) {
-                    this.isReporting = false;
-                    return;
-                }
-                retryCount++;
-                if (retryCount < maxRetry) {
-                    await sleep(retryDelay * retryCount);
-                }
-            } catch (error) {
-                this.logger.error('Report error: ', error);
-                retryCount++;
-                if (retryCount < maxRetry) {
-                    await sleep(retryDelay * retryCount);
-                }
+        try {
+            const success = await this.sendRequest(data);
+            if (success) {
+                this.isReporting = false;
+                return;
             }
+        } catch (error) {
+            this.logger.error('Report error: ', error);
         }
 
-        // 重试失败，将数据重新加入队列
-        this.logger.error(`Failed to report data ====> ${retryCount}`);
-        this.queue.unshift(...data);
+        // 上报失败，将数据存入 indexedDB
+        this.logger.error(`Failed to report data, caching to IndexedDB.`);
+        for (const item of data) {
+            // @ts-ignore
+            await this.addFailedLog({ ...item, retryCount: 0, status: 'pending', updateAt: Date.now() });
+        }
         this.isReporting = false;
     }
 
@@ -129,18 +114,6 @@ export class Reporter implements IReporter {
      * */
     private async sendRequest(data: BaseMonitorData[], id?: IDBValidKey | undefined): Promise<boolean> {
         try {
-            // 如果浏览器支持 Worker，使用 Worker 发送
-            if (!!this.worker?.postMessage) {
-                for (let i = 0; i < data.length; i++) {
-                    const result = data[i];
-                    this.worker?.postMessage({ type: "log", data: result });
-                }
-                return true;
-            }
-
-            // 1. 不支持 worker
-            // 2. 使用 sendBeacon 发送
-            // 2. 使用 fetch 发送
             const jsonData = safeJsonStringify(data);
             let compressed = strToU8(jsonData);
             let isCompressed = false;
@@ -156,7 +129,6 @@ export class Reporter implements IReporter {
             if (compressed.length > this.BEACON_SIZE_LIMIT) {
                 this.logger.log('Large data detected, sending in batches');
                 isMaxBody = true;
-                // return false;
             }
 
             // 尝试使用 sendBeacon API 发送数据
@@ -167,6 +139,9 @@ export class Reporter implements IReporter {
 
                 const success = navigator.sendBeacon(`${this.config.reportUrl}/b`, blob);
                 if (success) {
+                    if (id) {
+                        await this.db?.delete(this.dbStoreName, id);
+                    }
                     return true
                 }
             }
@@ -193,24 +168,46 @@ export class Reporter implements IReporter {
             if (request.ok) {
                 this.logger?.log?.(`report log success: ${data.length}`);
                 // 上报成功，清理日志
-                id && await this.db?.delete(this.dbStoreName, id);
+                if (id) {
+                    await this.db?.delete(this.dbStoreName, id);
+                }
                 return true;
             } else {
+                this.logger.error(`上报失败： ${request.status} ${request.statusText}`);
                 if (id) {
-                    // 存在则更新
-                    await this.db?.put(this.dbStoreName, id, {
-                        status: "failed",
-                        retryCount: data.retryCount + 1,
-                        updateAt: Date.now()
-                    });
-                } else {
-                    this.logger.error(`上报失败： ${request.status} ${request.statusText}`);
-                    await this.db?.add(this.dbStoreName, data);
+                    const logFromDb = data[0] as any;
+                    const newRetryCount = (logFromDb.retryCount || 0) + 1;
+                    const maxRetry = this.config.maxRetry || 3;
+
+                    if (newRetryCount >= maxRetry) {
+                        this.logger.warn(`Log reached max retries (${maxRetry}). Deleting from cache.`, logFromDb);
+                        await this.db?.delete(this.dbStoreName, id);
+                    } else {
+                        // @ts-ignore
+                        const updatedLog = { ...logFromDb, retryCount: newRetryCount, updateAt: Date.now(), status: 'failed' };
+                        await this.db?.put(this.dbStoreName, id, updatedLog);
+                    }
                 }
                 return false
             }
         } catch (error) {
             this.logger.error('Send batch error ====> ', error);
+            if (id) {
+                try {
+                    const logFromDb = data[0] as any;
+                    const newRetryCount = (logFromDb.retryCount || 0) + 1;
+                    const maxRetry = this.config.maxRetry || 3;
+                    if (newRetryCount >= maxRetry) {
+                        await this.db?.delete(this.dbStoreName, id);
+                    } else {
+                        // @ts-ignore
+                        const updatedLog = { ...logFromDb, retryCount: newRetryCount, updateAt: Date.now(), status: 'failed' };
+                        await this.db?.put(this.dbStoreName, id, updatedLog);
+                    }
+                } catch (dbError) {
+                    this.logger.error('Failed to update log in DB after send error:', dbError);
+                }
+            }
             return false;
         }
     }
@@ -231,8 +228,6 @@ export class Reporter implements IReporter {
                     resolve(true);
                 }
 
-                // 对于图片请求，数据通过URL参数传递，有长度限制
-                // 这里只发送精简的数据
                 const simplifiedData = data.map(item => ({
                     type: item.type,
                     data: safeJsonStringify(item.data),
@@ -244,7 +239,6 @@ export class Reporter implements IReporter {
 
                 const url = `${this.config.reportUrl}/img?${params.toString()}`;
 
-                // 检查URL长度限制
                 if (url.length > 2000) {
                     this.logger.warn('Image request URL too long, skipping');
                     resolve(false);
@@ -266,23 +260,47 @@ export class Reporter implements IReporter {
             return
         }
         try {
-            const pendingLogs = await this.db?.getAll<BaseMonitorData>(this.dbStoreName, "status");
+            const pendingLogs = await this.db?.getAll<any>(this.dbStoreName);
 
             if (!pendingLogs || pendingLogs.length === 0) return;
+
+            const maxRetry = this.config.maxRetry || 3;
+
             for (const log of pendingLogs) {
-                if (log.status === "success" || (log?.retryCount && this.config?.maxRetry && log.retryCount >= this.config.maxRetry)) {
-                    // 删除已成功的日志和已达到最大重试次数的日志
+                if (!log || !log.id) continue;
+
+                if (log.status === "success" || (log.retryCount && log.retryCount >= maxRetry)) {
                     await this.db?.delete(this.dbStoreName, log.id);
                 } else {
-                    // 重试失败的日志
+                    // @ts-ignore
                     await this.sendRequest([log], log.id);
                 }
 
-                // 避免并发请求过多，稍作延迟
-                await sleep(1000);
+                await sleep(100);
             }
         } catch (error) {
             this.logger?.error?.("Failed to retry failed logs:", error);
+        }
+    }
+
+    private async addFailedLog(item: any): Promise<void> {
+        if (!this.db?.loaded) {
+            this.logger.warn("DB not ready, cannot cache failed log.");
+            return;
+        }
+        try {
+            const allLogs = await this.db.getAll<any>(this.dbStoreName);
+            if (allLogs && allLogs.length >= 50) {
+                this.logger.warn("IndexedDB cache is full (50 items). Removing oldest log.");
+                allLogs.sort((a, b) => a.updateAt - b.updateAt);
+                const oldestLog = allLogs[0];
+                if (oldestLog.id) {
+                    await this.db.delete(this.dbStoreName, oldestLog.id);
+                }
+            }
+            await this.db.add(this.dbStoreName, item);
+        } catch (error) {
+            this.logger.error('Failed to add log to indexedDB:', error);
         }
     }
 
@@ -314,55 +332,8 @@ export class Reporter implements IReporter {
             this.timer = null;
         }
 
-        // 发送剩余的数据
         if (this.queue.length > 0) {
             this.flush();
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

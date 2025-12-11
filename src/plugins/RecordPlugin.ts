@@ -2,8 +2,10 @@ import { Plugin } from "../core/Plugin";
 import { MonitorType } from "../types";
 import { generateId, safeJsonStringify } from "../utils/common";
 import { addEventListener } from "../utils/helpers";
-import { record } from 'rrweb';
-import {IndexedDBManager} from "../utils/indexedDBManager";
+import { IndexedDBManager } from "../utils/indexedDBManager";
+
+// rrweb record function type, will be loaded dynamically
+type RecordFn = (options: any) => (() => void) | void;
 
 /**
  * rrweb事件类型枚举
@@ -267,7 +269,7 @@ export class RecordPlugin extends Plugin {
         cleanupThreshold: 0.8
     };
 
-    private stopRecording: ReturnType<typeof record> | null = null;
+    private stopRecording: any | null = null;
     private eventManager: SmartEventManager;
     private activeSessions: Map<string, RecordSession> = new Map();
     private isRecording = false;
@@ -285,6 +287,10 @@ export class RecordPlugin extends Plugin {
     private dbStoreName = "records";
     private errorSessionMap: Map<string, string> = new Map();
 
+    // Dynamically loaded rrweb record function
+    private recordFn: RecordFn | null = null;
+    private isRrwebLoaded = false;
+
     constructor(config?: Partial<RecordConfig>) {
         super();
         this.config = { ...this.config, ...config };
@@ -292,7 +298,18 @@ export class RecordPlugin extends Plugin {
     }
 
     protected async init(): Promise<void> {
-        this.logger.log('Initializing RecordPlugin with enhanced completeness checks');
+        this.logger.log('Initializing RecordPlugin...');
+
+        try {
+            const { record } = await import('rrweb');
+            this.recordFn = record;
+            this.isRrwebLoaded = true;
+            this.logger.log('rrweb loaded successfully.');
+        } catch (error) {
+            this.isRrwebLoaded = false;
+            this.logger.warn('Failed to load rrweb. Recording feature will be disabled. This might be caused by an ad blocker.', error);
+            return; // Stop initialization if rrweb fails to load
+        }
 
         this.db = IndexedDBManager.getInstance();
 
@@ -348,13 +365,15 @@ export class RecordPlugin extends Plugin {
      * 开始持续录制
      */
     private startContinuousRecording(): void {
-        if (this.isRecording) return;
+        if (!this.isRrwebLoaded || !this.recordFn || this.isRecording) {
+            return;
+        }
 
         try {
             // 存储takeFullSnapshot引用，用于强制生成快照
             let takeFullSnapshot: (() => void) | null = null;
 
-            this.stopRecording = record({
+            this.stopRecording = this.recordFn({
                 ...this.config.recordOptions,
                 emit: (event: RecordEvent) => {
                     // 处理事件
@@ -386,6 +405,7 @@ export class RecordPlugin extends Plugin {
             this.logger.log('Continuous recording started');
         } catch (error) {
             this.logger.error('Failed to start recording:', error);
+            this.isRecording = false;
         }
     }
 
@@ -393,6 +413,7 @@ export class RecordPlugin extends Plugin {
      * 处理录制事件
      */
     private handleRecordEvent(event: RecordEvent): void {
+        if (!this.isRrwebLoaded) return;
         // 如果有活跃会话，直接添加到会话
         if (this.currentSessionId) {
             const session = this.activeSessions.get(this.currentSessionId);
@@ -410,6 +431,7 @@ export class RecordPlugin extends Plugin {
      * 开始定期快照
      */
     private startPeriodicSnapshot(): void {
+        if (!this.isRrwebLoaded) return;
         this.timers.snapshot = setInterval(() => {
             if (this.isRecording && (window as any).rrwebTakeFullSnapshot) {
                 try {
@@ -426,6 +448,7 @@ export class RecordPlugin extends Plugin {
      * 错误触发录制
      */
     public async errorTrigger(errorId: string): Promise<string | null> {
+        if (!this.isRrwebLoaded) return null;
         this.logger.log('Error triggered recording:', errorId);
         const sessionId = await this.startSession(RecordTriggerType.ERROR, errorId);
 
@@ -440,6 +463,7 @@ export class RecordPlugin extends Plugin {
      * 手动触发录制
      */
     public manualTrigger(triggerData?: any): Promise<string | null> {
+        if (!this.isRrwebLoaded) return Promise.resolve(null);
         return this.startSession(RecordTriggerType.MANUAL, triggerData);
     }
 
@@ -447,6 +471,7 @@ export class RecordPlugin extends Plugin {
      * 自定义触发录制
      */
     public customTrigger(errorId?: string): Promise<string | null> {
+        if (!this.isRrwebLoaded) return Promise.resolve(null);
         return this.startSession(RecordTriggerType.CUSTOM, errorId);
     }
 
@@ -454,6 +479,7 @@ export class RecordPlugin extends Plugin {
      * 开始录制会话
      */
     private async startSession(triggerType: RecordTriggerType, errorId?: string): Promise<string | null> {
+        if (!this.isRrwebLoaded) return null;
         try {
             const sessionId = generateId();
 
@@ -698,6 +724,7 @@ export class RecordPlugin extends Plugin {
      * 检查待处理数据
      */
     private async checkPendingData(): Promise<void> {
+        if (!this.isRrwebLoaded) return;
         if (!this.db?.loaded) {
             this.timers.dbCheck = setTimeout(() => this.checkPendingData(), 200);
             return;
