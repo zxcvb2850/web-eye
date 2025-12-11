@@ -1,5 +1,6 @@
 export {Monitor} from "./core/Monitor";
-export { WebEyeConfig } from "./types"; // 从 types 的主入口导入
+import { WebEyeConfig } from "./types/index";
+export type { WebEyeConfig };
 export {ConsolePlugin} from "./plugins/ConsolePlugin";
 export {RequestPlugin} from "./plugins/RequestPlugin";
 export {ResourcePlugin} from "./plugins/ResourcePlugin";

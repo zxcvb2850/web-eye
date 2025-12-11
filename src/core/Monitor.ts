@@ -1,5 +1,4 @@
-import {WebEyeConfig} from "../types/config";
-import {BaseMonitorData, IPlugin, MonitorData} from "../types";
+import {BaseMonitorData, IPlugin, MonitorData, WebEyeConfig} from "../types";
 import {Reporter} from "./Reporter";
 import {Logger} from "./Logger";
 import {generateId, getFingerprint} from "../utils/common";

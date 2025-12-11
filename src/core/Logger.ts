@@ -1,5 +1,5 @@
 import type { ILogger } from "../types";
-import type { LogLevel } from "../types/config";
+import { LogLevel } from "../types";
 
 /**
  * SDK 日志配置

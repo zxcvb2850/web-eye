@@ -137,7 +137,7 @@ export class Reporter implements IReporter {
                     type: isCompressed ? 'application/gzip' : 'application/json',
                 });
 
-                const success = navigator.sendBeacon(`${this.config.reportUrl}/b`, blob);
+                const success = navigator.sendBeacon(`${this.config.reportUrl}/beacon`, blob);
                 if (success) {
                     if (id) {
                         await this.db?.delete(this.dbStoreName, id);
@@ -159,7 +159,7 @@ export class Reporter implements IReporter {
                     type: isCompressed ? 'application/gzip' : 'application/json',
                 });
             }
-            const request = await fetch(`${this.config.reportUrl}/f`, {
+            const request = await fetch(`${this.config.reportUrl}/fetch`, {
                 method: 'POST',
                 headers,
                 body,
