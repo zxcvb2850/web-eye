@@ -12,7 +12,8 @@
   "dependencies": {
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "rrweb-player": "1.0.0-alpha.4"
+    "rrweb-player": "1.0.0-alpha.4",
+    "web-eye-logs": "file:.yalc/web-eye-logs"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

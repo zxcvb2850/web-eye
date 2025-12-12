@@ -19,11 +19,5 @@ export default defineConfig({
             uploadUrl: 'http://localhost:8989/a/r/s',
             appKey: '687642d8-09de-f077-bf27-d8c9',
         }),
-    ],
-    resolve: {
-        alias: {
-            // 设置别名，让示例项目能直接引用到 src 下的源码
-            'web-eye-logs': path.resolve(__dirname, '../../src/index.ts')
-        }
-    }
+    ]
 })

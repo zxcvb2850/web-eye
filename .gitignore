@@ -28,3 +28,7 @@ dist-ssr
 wasm-sdk-util/.idea
 wasm-sdk-util/pkg
 wasm-sdk-util/target
+
+# yalc
+.yalc
+yalc.lock

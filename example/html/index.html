@@ -5,36 +5,31 @@
     <title>HTML Demo</title>
 </head>
 <body>
-<script src="/dist/index.global.js"></script>
+<script src="./dist/index.global.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 <script>
-    const monitor = new WebEyeLogs.Monitor({
-        appKey: "xxxxx",
-        reportUrl: "http://localhost:8989/a/r",
+    console.info("===>WebEyeMonitor", window.WebEyeLogs)
+    const monitor = new window.WebEyeLogs.Monitor({
+        appId: 'your-app-id',
+        reportUrl: 'http://localhost:8989/report'
     });
 
-    monitor
-        .use(new WebEyeLogs.ConsolePlugin())
-        .use(new WebEyeLogs.WhiteScreenPlugin({
-            checkDOMCount: false,
-            // skipSelectors: ["meta", "head", "script", "style"], // 忽略的元素选择器(checkDOMCount 为 true 时生效)
-            // whiteScreenDoms: ["#root"],
-        }))
-        .use(new WebEyeLogs.PerformancePlugin())
-        .use(new WebEyeLogs.CustomPlugin())
-        .use(new WebEyeLogs.ErrorPlugin({
-            enableBehaviorReport: false,      // 启用行为上报
-            behaviorDelay: 5000,            // 延迟上报时间(ms) enableBehaviorReport 为 true 时有效
-            maxBehaviorRecords: 50,         // 最大行为记录数
-            enableSourceMap: true,          // 启用source map解析
-            filterErrors: (error) => true   // 错误过滤函数
-        }))
-        .use(new WebEyeLogs.RequestPlugin({
-            filterHeadersWhite: ["token"],
-        }))
-        .use(new WebEyeLogs.ResourcePlugin())
-        .use(new WebEyeLogs.RecordPlugin())
-        .install();
+    monitor.use(new window.WebEyeLogs.plugins.ErrorPlugin({
+        enableBehaviorReport: false,      // 启用行为上报
+        behaviorDelay: 5000,            // 延迟上报时间(ms) enableBehaviorReport 为 true 时有效
+        maxBehaviorRecords: 50,         // 最大行为记录数
+        enableSourceMap: true,          // 启用source map解析
+        filterErrors: (error) => true   // 错误过滤函数
+    }));
+    monitor.use(new window.WebEyeLogs.plugins.WhiteScreenPlugin({
+        checkDOMCount: false,
+        // skipSelectors: ["meta", "head", "script", "style"], // 忽略的元素选择器(checkDOMCount 为 true 时生效)
+        // whiteScreenDoms: ["#root"],
+    }));
+    monitor.use(new window.WebEyeLogs.plugins.RequestPlugin({
+        filterHeadersWhite: ["token"],
+    }))
+    monitor.install();
 
     setTimeout(() => {
         axios.get("http://localhost:8989/healthxx", {
