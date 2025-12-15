@@ -19,14 +19,15 @@ import {
 
 // 1. 初始化 Monitor
 const monitor = new Monitor({
-    debug: true, // 开启调试模式，会打印日志
-    appKey: "684a7987-24dd-89c2-252d-c797", // 替换为您的应用 KEY
-    reportUrl: "http://localhost:8989/report", // 替换为您的上报地址
-    extends: { // 自定义扩展信息，会附加到每条日志
-        uid: "1111",
-        channelId: "10000",
-    }
-});
+  debug: true, // 开启调试模式，会打印日志
+  appKey: '684a798724dd89c2252dc797', // 替换为您的应用 KEY
+  reportUrl: 'http://localhost:8988/report', // 替换为您的上报地址
+  extends: {
+    // 自定义扩展信息，会附加到每条日志
+    uid: '1111',
+    channelId: '10000',
+  },
+})
 
 // 2. 创建插件实例
 const consolePlugin = new ConsolePlugin({
