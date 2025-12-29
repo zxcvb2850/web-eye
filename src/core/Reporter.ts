@@ -9,155 +9,331 @@ import { IndexedDBManager } from "../utils/indexedDBManager";
  * 数据上报器
  * */
 export class Reporter implements IReporter {
-  private worker: Worker | null = null
-  private queue: BaseMonitorData[] = []
-  private isWorkerReady = false
-  private pendingQueue: BaseMonitorData[] = []
-  private config: WebEyeConfig
-  private logger: Logger
+  private config: WebEyeConfig;
+  private logger: Logger;
+  private queue: BaseMonitorData[] = [];
+  private timer: NodeJS.Timeout | null = null;
+  private isReporting = false;
+  private db: IndexedDBManager | null = null;
+  private readonly dbStoreName = "report_fails";
 
-  constructor(config: WebEyeConfig, logger: Logger) {
-    this.config = config
-    this.logger = logger
-    this.initWorker()
-    this.bindVisibilityChange()
+  // sendBeacon 数据大小限制（通常为64KB）
+  private readonly BEACON_SIZE_LIMIT = 64 * 1024;
+  // 压缩阈值，超过此大小才进行压缩
+  private readonly COMPRESS_THRESHOLD = 1024;
+
+  constructor(
+      config: WebEyeConfig,
+      logger: Logger
+  ) {
+    this.config = config;
+    this.logger = logger;
+    this.bindBeforeUnload();
+    this.init();
   }
 
-  private initWorker() {
-    if (typeof Worker === 'undefined') {
-      this.logger.warn('Web Workers are not supported in this environment')
-      return
-    }
+  async init() {
+    this.db = new IndexedDBManager()
+
+    // 启动时重试之前的失败的日志
+    await this.retryFailedLogs();
+  }
+
+  /**
+   * 上报数据
+   * */
+  async report(data: BaseMonitorData[]): Promise<void> {
+    const items = Array.isArray(data) ? data: [data];
+
+    await this.sendData(items);
+  }
+
+  /**
+   * 刷新队列，发送所有数据
+   * */
+  async flush(): Promise<void> {
+    if (this.queue.length === 0 || this.isReporting) return;
+
+    const dataToSend = [...this.queue];
+    this.queue = [];
+
+    await this.sendData(dataToSend);
+  }
+
+  /**
+   * 发送数据到服务器
+   * */
+  private async sendData(data: BaseMonitorData[]): Promise<void> {
+    if (data.length === 0) return;
+
+    this.isReporting = true;
 
     try {
-      // 使用 webpack 的 worker-loader 或类似的构建工具来加载 worker
-      this.worker = new Worker(
-        new URL('../../worker/reportWorker.ts', import.meta.url),
-        {
-          type: 'module',
-        }
-      )
-
-      this.worker.onmessage = (e) => {
-        const { type, payload } = e.data
-
-        if (type === 'REPORT_SUCCESS') {
-          this.logger.log('Report successful:', payload.result)
-          this.processQueue()
-        } else if (type === 'REPORT_ERROR') {
-          this.logger.error('Report failed:', payload.error)
-          this.retryLater(payload.data)
-        }
+      const success = await this.sendRequest(data);
+      if (success) {
+        this.isReporting = false;
+        return;
       }
-
-      this.worker.onerror = (error) => {
-        this.logger.error('Worker error:', error)
-        this.isWorkerReady = false
-      }
-
-      this.isWorkerReady = true
-      this.processQueue()
     } catch (error) {
-      this.logger.error('Failed to initialize worker:', error)
+      this.logger.error('Report error: ', error);
+    }
+
+    // 上报失败，将数据存入 indexedDB
+    this.logger.error(`Failed to report data, caching to IndexedDB.`);
+    for (const item of data) {
+      // @ts-ignore
+      await this.addFailedLog({ ...item, retryCount: 0, status: 'pending', updateAt: Date.now() });
+    }
+    this.isReporting = false;
+  }
+
+  /**
+   * 检查数据是否适合使用 sendBeacon
+   * */
+  private canUseSendBeacon(dataSize: number, dataLength: number): boolean {
+    // 检查浏览器支持
+    if (!navigator.sendBeacon) {
+      return false;
+    }
+
+    // 检查数据大小限制
+    if (dataSize > this.BEACON_SIZE_LIMIT) {
+      return false;
+    }
+
+    // 检查数据条数限制（可根据实际情况调整）
+    if (dataLength > 10) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 发送 HTTP 请求
+   * */
+  private async sendRequest(data: BaseMonitorData[], id?: IDBValidKey | undefined): Promise<boolean> {
+    try {
+      const jsonData = safeJsonStringify(data);
+      let compressed = strToU8(jsonData);
+      let isCompressed = false;
+      // 检查是否需要压缩数据
+      if (this.config.debug) {
+      } else {
+        const comData = compressData(jsonData);
+        compressed = comData.compressed;
+        isCompressed = comData.isCompressed;
+      }
+      let isMaxBody = false;
+      // 如果数据量过大，则使用分批发送
+      if (compressed.length > this.BEACON_SIZE_LIMIT) {
+        this.logger.log('Large data detected, sending in batches');
+        isMaxBody = true;
+      }
+
+      // 尝试使用 sendBeacon API 发送数据
+      if (this.canUseSendBeacon(compressed.length, data.length)) {
+        const blob = new Blob([compressed], {
+          type: isCompressed ? 'application/gzip' : 'application/json',
+        });
+
+        const success = navigator.sendBeacon(`${this.config.reportUrl}/beacon`, blob);
+        if (success) {
+          if (id) {
+            await this.db?.delete(this.dbStoreName, id);
+          }
+          return true
+        }
+      }
+
+      // 使用 fetch API 发送数据
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'EyeLogTag': '1', // 标记为内部请求
+      }
+      let body: string|Blob = jsonData;
+      if (isCompressed) {
+        headers['Content-Encoding'] = 'gzip';
+        headers['Content-Type'] = 'application/gzip';
+        body = new Blob([compressed], {
+          type: isCompressed ? 'application/gzip' : 'application/json',
+        });
+      }
+      const request = await fetch(`${this.config.reportUrl}/fetch`, {
+        method: 'POST',
+        headers,
+        body,
+        keepalive: !isMaxBody,
+      })
+      if (request.ok) {
+        this.logger?.log?.(`report log success: ${data.length}`);
+        // 上报成功，清理日志
+        if (id) {
+          await this.db?.delete(this.dbStoreName, id);
+        }
+        return true;
+      } else {
+        this.logger.error(`上报失败： ${request.status} ${request.statusText}`);
+        if (id) {
+          const logFromDb = data[0] as any;
+          const newRetryCount = (logFromDb.retryCount || 0) + 1;
+          const maxRetry = this.config.maxRetry || 3;
+
+          if (newRetryCount >= maxRetry) {
+            this.logger.warn(`Log reached max retries (${maxRetry}). Deleting from cache.`, logFromDb);
+            await this.db?.delete(this.dbStoreName, id);
+          } else {
+            // @ts-ignore
+            const updatedLog = { ...logFromDb, retryCount: newRetryCount, updateAt: Date.now(), status: 'failed' };
+            await this.db?.put(this.dbStoreName, id, updatedLog);
+          }
+        }
+        return false
+      }
+    } catch (error) {
+      this.logger.error('Send batch error ====> ', error);
+      if (id) {
+        try {
+          const logFromDb = data[0] as any;
+          const newRetryCount = (logFromDb.retryCount || 0) + 1;
+          const maxRetry = this.config.maxRetry || 3;
+          if (newRetryCount >= maxRetry) {
+            await this.db?.delete(this.dbStoreName, id);
+          } else {
+            // @ts-ignore
+            const updatedLog = { ...logFromDb, retryCount: newRetryCount, updateAt: Date.now(), status: 'failed' };
+            await this.db?.put(this.dbStoreName, id, updatedLog);
+          }
+        } catch (dbError) {
+          this.logger.error('Failed to update log in DB after send error:', dbError);
+        }
+      }
+      return false;
     }
   }
 
-  async report(data: BaseMonitorData[]): Promise<void> {
-    const items = Array.isArray(data) ? data : [data]
-    this.queue.push(...items)
+  /**
+   * 使用图片请求发送数据（兜底方案）
+   * */
+  private sendByImage(data: BaseMonitorData[]): Promise<boolean> {
+    return new Promise(resolve => {
+      try {
+        const image = new Image();
+        const timeout = setTimeout(() => {
+          resolve(false);
+        }, 10000);
 
-    if (this.isWorkerReady) {
-      this.processQueue()
-    } else if (
-      typeof document !== 'undefined' &&
-      document.visibilityState === 'hidden'
-    ) {
-      // 如果页面隐藏但worker还没准备好，使用sendBeacon兜底
-      this.sendViaBeacon(items)
-    }
+        image.onload = image.onerror = () => {
+          clearTimeout(timeout);
+          resolve(true);
+        }
+
+        const simplifiedData = data.map(item => ({
+          type: item.type,
+          data: safeJsonStringify(item.data),
+        }));
+
+        const params = new URLSearchParams({
+          data: safeJsonStringify(simplifiedData),
+        });
+
+        const url = `${this.config.reportUrl}/img?${params.toString()}`;
+
+        if (url.length > 2000) {
+          this.logger.warn('Image request URL too long, skipping');
+          resolve(false);
+          return;
+        }
+
+        image.src = url;
+      } catch (error) {
+        this.logger.error('SendByImage error:', error);
+        resolve(false);
+      }
+    });
   }
 
-  private processQueue() {
-    if (!this.isWorkerReady || this.queue.length === 0) return
-
-    const batchSize = this.config.batchSize || 10
-    const batch = this.queue.splice(0, batchSize)
-
-    this.worker?.postMessage({
-      type: 'REPORT',
-      payload: {
-        data: batch,
-        config: {
-          reportUrl: this.config.reportUrl,
-          // 其他需要的配置
-        },
-      },
-    })
-  }
-
-  private sendViaBeacon(data: BaseMonitorData[]) {
-    if (typeof navigator === 'undefined' || !navigator.sendBeacon) {
-      return false
-    }
-
-    const blob = new Blob([JSON.stringify(data)], {
-      type: 'application/json',
-    })
-
-    return navigator.sendBeacon(this.config.reportUrl, blob)
-  }
-
-  private retryLater(data: BaseMonitorData[]) {
-    // 指数退避重试
-    const retryCount = data[0]?.retryCount || 0
-    if (retryCount >= (this.config.maxRetry || 3)) {
-      this.logger.warn('Max retry count reached, giving up on:', data)
+  /**
+   * */
+  private async retryFailedLogs(): Promise<void> {
+    if (!this.db?.loaded) {
       return
     }
+    try {
+      const pendingLogs = await this.db?.getAll<any>(this.dbStoreName);
 
-    const delay = Math.min(1000 * Math.pow(2, retryCount), 30000) // 最大30秒
+      if (!pendingLogs || pendingLogs.length === 0) return;
 
-    setTimeout(() => {
-      data.forEach((item) => {
-        item.retryCount = (item.retryCount || 0) + 1
-      })
-      this.report(data)
-    }, delay)
-  }
+      const maxRetry = this.config.maxRetry || 3;
 
-  private bindVisibilityChange() {
-    if (typeof document === 'undefined') return
+      for (const log of pendingLogs) {
+        if (!log || !log.id) continue;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // 页面可见时处理队列
-        this.processQueue()
-      } else if (
-        document.visibilityState === 'hidden' &&
-        this.queue.length > 0
-      ) {
-        // 页面隐藏时，如果还有未处理的数据，使用sendBeacon发送
-        this.sendViaBeacon([...this.queue])
-        this.queue = []
+        if (log.status === "success" || (log.retryCount && log.retryCount >= maxRetry)) {
+          await this.db?.delete(this.dbStoreName, log.id);
+        } else {
+          // @ts-ignore
+          await this.sendRequest([log], log.id);
+        }
+
+        await sleep(100);
       }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-  }
-
-  async flush(): Promise<void> {
-    if (this.queue.length === 0) return
-
-    if (this.isWorkerReady) {
-      this.processQueue()
-    } else {
-      this.sendViaBeacon([...this.queue])
-      this.queue = []
+    } catch (error) {
+      this.logger?.error?.("Failed to retry failed logs:", error);
     }
   }
 
+  private async addFailedLog(item: any): Promise<void> {
+    if (!this.db?.loaded) {
+      this.logger.warn("DB not ready, cannot cache failed log.");
+      return;
+    }
+    try {
+      const allLogs = await this.db.getAll<any>(this.dbStoreName);
+      if (allLogs && allLogs.length >= 50) {
+        this.logger.warn("IndexedDB cache is full (50 items). Removing oldest log.");
+        allLogs.sort((a, b) => a.updateAt - b.updateAt);
+        const oldestLog = allLogs[0];
+        if (oldestLog.id) {
+          await this.db.delete(this.dbStoreName, oldestLog.id);
+        }
+      }
+      await this.db.add(this.dbStoreName, item);
+    } catch (error) {
+      this.logger.error('Failed to add log to indexedDB:', error);
+    }
+  }
+
+  /**
+   * 绑定页面卸载事件
+   * */
+  private bindBeforeUnload(): void {
+    // 页面卸载前发送剩余数据
+    addEventListener(window, 'beforeunload', () => {
+      if (this.queue.length > 0) {
+        this.sendRequest(this.queue);
+      }
+    })
+
+    // 页面隐藏时发送数据
+    addEventListener(document,'visibilitychange', () => {
+      if (getPageVisibility() === "hidden" && this.queue.length > 0) {
+        this.flush();
+      }
+    })
+  }
+
+  /**
+   * 销毁上报器
+   * */
   destroy(): void {
-    this.worker?.terminate()
-    this.isWorkerReady = false
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+
+    if (this.queue.length > 0) {
+      this.flush();
+    }
   }
 }

@@ -43,6 +43,10 @@ export class Monitor {
      * 合并配置
      * */
     private mergeConfig(config: WebEyeConfig): WebEyeConfig {
+        if (config.reportUrl.endsWith("/")) {
+            config.reportUrl = config.reportUrl.slice(0, -1);
+        }
+
         return {
             maxRetry: 3,
             retryDelay: 1000,
