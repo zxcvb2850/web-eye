@@ -129,11 +129,7 @@ export class ErrorPlugin extends Plugin {
         // 是否监听 Promise 错误
         if (this.config.enablePromise) {
           // @ts-ignore Promise未捕获错误（如果需要的话可以启用
-          addEventListener(
-            window,
-            'unhandledrejection',
-            this.handlePromiseError.bind(this)
-          )
+          addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this))
         }
     }
 
