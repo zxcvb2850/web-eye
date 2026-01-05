@@ -14,8 +14,8 @@ export default defineConfig({
   // 生成类型声明文件
   dts: true,
   // 固定输出目录为 dist
-  // outDir: `dist/v${pkg.version}`,
-  outDir: `dist`,
+  outDir: `dist/v${pkg.version}`,
+  // outDir: `dist`,
   minify: true,
   clean: true,
   target: 'es2017',

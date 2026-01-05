@@ -53,12 +53,13 @@ interface UserAction {
  * ErrorPlugin配置接口
  */
 interface ErrorConfig {
-    enableBehaviorReport: boolean; // 是否启用行为上报
-    behaviorDelay: number; // 错误发生后延迟上报时间(ms)
-    maxBehaviorRecords: number; // 最大行为记录数
-    enableSourceMap: boolean; // 是否启用source map解析
-    filterErrors: (error: ErrorInfo) => boolean; // 错误过滤函数
-    enableRecordTrigger: boolean; // 是否启用录制触发
+  enablePromise: boolean // 是否启用监听 Promise 错误
+  enableBehaviorReport: boolean // 是否启用行为上报
+  behaviorDelay: number // 错误发生后延迟上报时间(ms)
+  maxBehaviorRecords: number // 最大行为记录数
+  enableSourceMap: boolean // 是否启用source map解析
+  filterErrors: (error: ErrorInfo) => boolean // 错误过滤函数
+  enableRecordTrigger: boolean // 是否启用录制触发
 }
 
 /**
@@ -68,6 +69,7 @@ export class ErrorPlugin extends Plugin {
     name = 'ErrorPlugin';
 
     private config: ErrorConfig = {
+        enablePromise: true,
         enableBehaviorReport: true,
         behaviorDelay: 5000, // 5秒延迟
         maxBehaviorRecords: 20,
@@ -124,8 +126,15 @@ export class ErrorPlugin extends Plugin {
         // @ts-ignore JS运行时错误
         addEventListener(window, 'error', this.handleJSError.bind(this));
 
-        // @ts-ignore Promise未捕获错误（如果需要的话可以启用
-        addEventListener(window, 'unhandledrejection', this.handlePromiseError.bind(this));
+        // 是否监听 Promise 错误
+        if (this.config.enablePromise) {
+          // @ts-ignore Promise未捕获错误（如果需要的话可以启用
+          addEventListener(
+            window,
+            'unhandledrejection',
+            this.handlePromiseError.bind(this)
+          )
+        }
     }
 
     /**
