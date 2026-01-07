@@ -19,7 +19,7 @@ export default defineConfig({
   minify: true,
   clean: true,
   target: 'es2017',
-  sourcemap: true,
+  sourcemap: !isPro,
   esbuildOptions: (options) => {
     options.minify = true
 

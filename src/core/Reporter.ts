@@ -36,7 +36,9 @@ export class Reporter implements IReporter {
     this.db = new IndexedDBManager()
 
     // 启动时重试之前的失败的日志
-    await this.retryFailedLogs();
+    setTimeout(async () => {
+        await this.retryFailedLogs();
+    }, 1000)
   }
 
   /**
@@ -272,8 +274,10 @@ export class Reporter implements IReporter {
         if (log.status === "success" || (log.retryCount && log.retryCount >= maxRetry)) {
           await this.db?.delete(this.dbStoreName, log.id);
         } else {
+	  const cacheLog = {...log};
+	  if (cacheLog?.id) delete cacheLog.id;
           // @ts-ignore
-          await this.sendRequest([log], log.id);
+          await this.sendRequest([cacheLog], log.id);
         }
 
         await sleep(100);
